@@ -205,11 +205,11 @@ if final_data:
     # GRID
     st.subheader("🔥 Expected Value (EV) Heatmap")
     
-    # Updated explanation block explaining the smoothing
-    st.info("""
-    **What does "Est: $" mean?**
-    This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by looking at the current tournament hit rate of your Winner Digit multiplied by the hit rate of your Loser Digit, applied to the remaining unawarded prize pool. *(Note: We use statistical "smoothing" so that even if a number hasn't hit yet, it never drops to a 0% probability—keeping everyone's board alive!)*
-    """)
+    # --- REPLACED ST.INFO WITH EXPANDER HERE ---
+    with st.expander("ℹ️ What does 'Est: $' mean? (Click to read)"):
+        st.write("""
+        This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by looking at the current tournament hit rate of your Winner Digit multiplied by the hit rate of your Loser Digit, applied to the remaining unawarded prize pool. *(Note: We use statistical "smoothing" so that even if a number hasn't hit yet, it never drops to a 0% probability—keeping everyone's board alive!)*
+        """)
     
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
     for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
@@ -218,7 +218,7 @@ if final_data:
 
     html_grid = """
     <style>
-        .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; }
+        .grid-container { overflow-x: auto; margin-top: 10px; border-radius: 8px; }
         .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; }
         .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
