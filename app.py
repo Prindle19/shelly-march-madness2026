@@ -115,14 +115,15 @@ def fetch_tournament_data():
                     live_games.append({
                         "Matchup": f"{a_disp} @ {h_disp}", "Score": f"{a_s}-{h_s}",
                         "Time": ev['status']['type']['shortDetail'],
-                        "DisplayTime": display_time,
+                        "GameTime": sort_time, "DisplayTime": display_time,
                         "Leader": GRID_DATA.get(str(l_d), {}).get(str(w_d), "??"), "Potential": pay
                     })
         except: pass
         current += timedelta(days=1)
         
-    # Sort the final games list purely by the exact UTC timestamp before returning
+    # Sort both the final games and live games lists purely by the exact UTC timestamp
     final_games.sort(key=lambda x: x.get('GameTime', 0))
+    live_games.sort(key=lambda x: x.get('GameTime', 0))
     return final_games, live_games
 
 # --- 4. UI DISPLAY ---
@@ -144,7 +145,6 @@ if live_data:
         with st.container(border=True):
             c1, c2 = st.columns([2, 1])
             c1.markdown(f"**{g['Matchup']}**")
-            # Added Tip-off time here
             c1.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
@@ -153,7 +153,6 @@ if final_data:
     st.divider()
     st.header("📜 Game History")
     for g in final_data:
-        # Added the DisplayTime so users can see exactly when the game started
         with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} ({g['Result']})", expanded=False):
             st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
