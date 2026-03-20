@@ -164,7 +164,7 @@ if final_data:
     
     st.subheader("🔥 Fire & ❄️ Ice Digits")
     
-    st.markdown("##### Winner Digits")
+    st.markdown("##### Winner Team Score")
     w_sorted = win_counts.sort_values(ascending=False)
     col1, col2 = st.columns(2)
     with col1:
@@ -184,7 +184,7 @@ if final_data:
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    st.markdown("##### Loser Digits")
+    st.markdown("##### Loser Team Score")
     l_sorted = lose_counts.sort_values(ascending=False)
     col3, col4 = st.columns(2)
     with col3:
@@ -205,7 +205,6 @@ if final_data:
     # GRID
     st.subheader("🔥 Expected Value (EV) Heatmap")
     
-    # --- REPLACED ST.INFO WITH EXPANDER HERE ---
     with st.expander("ℹ️ What does 'Est: $' mean? (Click to read)"):
         st.write("""
         This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by looking at the current tournament hit rate of your Winner Digit multiplied by the hit rate of your Loser Digit, applied to the remaining unawarded prize pool. *(Note: We use statistical "smoothing" so that even if a number hasn't hit yet, it never drops to a 0% probability—keeping everyone's board alive!)*
