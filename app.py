@@ -7,7 +7,6 @@ import pytz
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
 
-# Grid data from your spreadsheet [cite: 1]
 GRID_DATA = {
     '8': {'3': 'Chrissy Gonzalez', '2': 'Jay & Larry', '1': 'CKel', '6': 'Ciara Conlon', '8': 'Syd & Drew', '9': 'Gene M', '5': 'Babeh 😘', '0': 'Smelly', '7': 'Tim McNelis', '4': 'Fuck Fatboy'},
     '7': {'3': 'Tim McNelis', '2': 'Denis', '1': 'Jenna Apgar', '6': 'Mom & Dad', '8': 'Craig McNelis', '9': 'Sam Greenstein', '5': 'Babeh 😘', '0': 'Loretta Kelly', '7': 'Lou T', '4': 'Mr. B'},
@@ -58,10 +57,10 @@ def fetch_tournament_data():
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
                 h_s, a_s = int(h['score']), int(a['score'])
                 
-                h_seed = h.get('curatedRank', {}).get('current', '')
-                a_seed = a.get('curatedRank', {}).get('current', '')
-                h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed and h_seed <= 16 else h['team']['shortDisplayName']
-                a_disp = f"({a_seed}) {a['team']['shortDisplayName']}" if a_seed and a_seed <= 16 else a['team']['shortDisplayName']
+                h_seed = h.get('curatedRank', {}).get('current', 99)
+                a_seed = a.get('curatedRank', {}).get('current', 99)
+                h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed <= 16 else h['team']['shortDisplayName']
+                a_disp = f"({a_seed}) {a['team']['shortDisplayName']}" if a_seed <= 16 else a['team']['shortDisplayName']
                 
                 if h_s > a_s: w_d, l_d = h_s % 10, a_s % 10
                 else: w_d, l_d = a_s % 10, h_s % 10
@@ -104,7 +103,7 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# GAME HISTORY (Expanded above Statistics)
+# GAME HISTORY
 if final_data:
     st.divider()
     st.header("📜 Game History")
@@ -127,44 +126,66 @@ if final_data:
     col1.success(f"🔥 Hot Winner: **{w_counts.idxmax()}** ({w_counts.max()} hits)")
     col2.error(f"❄️ Cold Loser: **{l_counts.idxmin()}** ({l_counts.min()} hits)")
 
-    # THE HEATMAPPED GRID 
+    # --- ADVANCED HTML GRID ---
     st.subheader("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=range(10), columns=range(10))
     for g in final_data:
         heatmap_wins.at[g['L'], g['W']] += 1
     
-    max_w = w_counts.max() if w_counts.max() > 0 else 1
-    max_l = l_counts.max() if l_counts.max() > 0 else 1
-    max_cell = heatmap_wins.max().max() if heatmap_wins.max().max() > 0 else 1
+    max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
+    max_cell = heatmap_wins.max().max() or 1
 
-    def get_color(val, mx):
-        return f"rgba(255, 102, 0, {min(val/mx, 1.0)})" if val > 0 else "#ffffff"
+    # CSS that respects Streamlit Light/Dark themes
+    html = """
+    <style>
+        .grid-container { overflow-x: auto; margin-top: 20px; }
+        .mm-table { width: 100%; min-width: 850px; border-collapse: collapse; font-family: sans-serif; font-size: 0.75rem; color: inherit; }
+        .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 8px; text-align: center; vertical-align: middle; }
+        .header-main { background-color: #003366; color: white; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; }
+        .header-digit { font-weight: bold; background-color: rgba(128,128,128,0.1); }
+        .side-label { background-color: #003366; color: white; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 40px; }
+        .cell-name { font-weight: bold; display: block; margin-bottom: 2px; }
+        .cell-wins { font-size: 0.65rem; opacity: 0.8; }
+    </style>
+    <div class='grid-container'>
+    <table class='mm-table'>
+    """
 
-    # HTML Table Generation 
-    html = "<div style='overflow-x:auto;'><table style='width:100%; min-width:800px; border-collapse:collapse; text-align:center; font-family:sans-serif; font-size:0.75rem;'>"
+    # ROW 1: GAME WINNER (Merged Header)
+    html += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER (Last Digit)</td></tr>"
     
-    # Winners Header
-    html += "<tr><td style='border:none;'></td>"
+    # ROW 2: Winner Digits
+    html += "<tr><td colspan='2' style='border:none;'></td>"
     for i in range(10):
-        bg = get_color(w_counts[i], max_w)
-        html += f"<td style='background:{bg}; font-weight:bold; border:1px solid #ddd; padding:10px;'>WINNER {i}</td>"
+        opacity = min(w_counts[i] / max_w, 1.0) if w_counts[i] > 0 else 0
+        html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {opacity});'>{i}</td>"
     html += "</tr>"
-    
-    # Grid Rows
+
+    # ROWS 3-12: Loser Label + Digits + Cells
     for r in range(10):
-        bg_y = get_color(l_counts[r], max_l)
-        html += f"<tr><td style='background:{bg_y}; font-weight:bold; border:1px solid #ddd; padding:10px;'>LOSER {r}</td>"
+        html += "<tr>"
+        if r == 0:
+            html += f"<td rowspan='10' class='side-label'>GAME LOSER (Last Digit)</td>"
+        
+        # Loser Digit Header
+        l_opacity = min(l_counts[r] / max_l, 1.0) if l_counts[r] > 0 else 0
+        html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {l_opacity});'>{r}</td>"
+        
+        # Grid Cells
         for c in range(10):
             val = heatmap_wins.at[r, c]
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
-            bg_cell = get_color(val, max_cell)
-            text_color = "white" if val > (max_cell/2) else "black"
+            c_opacity = min(val / max_cell, 1.0) if val > 0 else 0
             
-            html += f"<td style='background:{bg_cell}; color:{text_color}; border:1px solid #ddd; padding:8px; min-width:85px; height:60px;'>"
-            html += f"<b>{owner}</b>"
-            if val > 0: html += f"<br>({val} wins)"
+            # Determine text color based on cell intensity
+            txt_color = "white" if c_opacity > 0.5 else "inherit"
+            
+            html += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 80px; height: 55px;'>"
+            html += f"<span class='cell-name'>{owner}</span>"
+            if val > 0: html += f"<span class='cell-wins'>({val} wins)</span>"
             html += "</td>"
         html += "</tr>"
+
     html += "</table></div>"
     st.markdown(html, unsafe_allow_html=True)
 
