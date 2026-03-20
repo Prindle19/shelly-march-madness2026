@@ -29,6 +29,8 @@ PAYOUT_MAP = {
     "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
 }
 
+TOTAL_PRIZE_POOL = 9500
+
 def get_payout_info(date_str):
     schedule = {
         "20260319": "1st Round", "20260320": "1st Round",
@@ -42,10 +44,6 @@ def get_payout_info(date_str):
 
 # --- 2. DYNAMIC COLOR & GRAMMAR ENGINE ---
 def get_stretched_gradient(val, mx, mid):
-    """
-    3-Point Gradient: Ice (#05FFFF) -> Neutral -> Fire (#FF0505).
-    Returns (Background Color, Text Color).
-    """
     if val == mid:
         return "rgba(128, 128, 128, 0.2)", "inherit"
     
@@ -143,9 +141,13 @@ if final_data:
 # STATISTICS & GRID
 if final_data:
     st.divider()
-    st.header("📈 Tournament Statistics")
+    st.header("📈 Tournament Statistics & Expected Value")
     
-    # Separate the Winning and Losing digits
+    # Mathematical Variables for EV
+    games_played = len(final_data)
+    awarded_prizes = sum(g['Payout'] for g in final_data)
+    remaining_pool = TOTAL_PRIZE_POOL - awarded_prizes
+    
     win_digits = [g['W'] for g in final_data]
     lose_digits = [g['L'] for g in final_data]
     
@@ -154,18 +156,18 @@ if final_data:
     
     max_w = win_counts.max() or 1
     mid_w = win_counts.median() or (max_w / 2)
-    
     max_l = lose_counts.max() or 1
     mid_l = lose_counts.median() or (max_l / 2)
     
+    st.write(f"**Games Finished:** {games_played} / 63")
+    st.write(f"**Prize Pool Remaining:** ${remaining_pool:,.2f}")
+    
     st.subheader("🔥 Fire & ❄️ Ice Digits")
     
-    # Winner Digits Display
-    st.markdown("##### Winner Digits")
+    st.markdown("##### Winner Team Score")
     w_sorted = win_counts.sort_values(ascending=False)
     col1, col2 = st.columns(2)
     with col1:
-        st.write("**TOP 5 HOT**")
         html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in w_sorted.head(5).items():
             bg, tx = get_stretched_gradient(count, max_w, mid_w)
@@ -173,7 +175,6 @@ if final_data:
         html_h += "</div>"
         st.markdown(html_h, unsafe_allow_html=True)
     with col2:
-        st.write("**BOTTOM 5 COLD**")
         html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in w_sorted.tail(5).items():
             bg, tx = get_stretched_gradient(count, max_w, mid_w)
@@ -183,12 +184,10 @@ if final_data:
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Loser Digits Display
-    st.markdown("##### Loser Digits")
+    st.markdown("##### Loser Team Score")
     l_sorted = lose_counts.sort_values(ascending=False)
     col3, col4 = st.columns(2)
     with col3:
-        st.write("**TOP 5 HOT**")
         html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in l_sorted.head(5).items():
             bg, tx = get_stretched_gradient(count, max_l, mid_l)
@@ -196,7 +195,6 @@ if final_data:
         html_h += "</div>"
         st.markdown(html_h, unsafe_allow_html=True)
     with col4:
-        st.write("**BOTTOM 5 COLD**")
         html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in l_sorted.tail(5).items():
             bg, tx = get_stretched_gradient(count, max_l, mid_l)
@@ -205,7 +203,13 @@ if final_data:
         st.markdown(html_c, unsafe_allow_html=True)
 
     # GRID
-    st.subheader("🔥 Grid Heatmap")
+    st.subheader("🔥 Expected Value (EV) Heatmap")
+    
+    with st.expander("ℹ️ What does 'Est: $' mean? (Click to read)"):
+        st.write("""
+        This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by looking at the current tournament hit rate of your Winner Digit multiplied by the hit rate of your Loser Digit, applied to the remaining unawarded prize pool. *(Note: We use statistical "smoothing" so that even if a number hasn't hit yet, it never drops to a 0% probability—keeping everyone's board alive!)*
+        """)
+    
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
     for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
     max_win = heatmap_wins.max().max() or 1
@@ -213,7 +217,7 @@ if final_data:
 
     html_grid = """
     <style>
-        .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; }
+        .grid-container { overflow-x: auto; margin-top: 10px; border-radius: 8px; }
         .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; }
         .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
@@ -225,7 +229,6 @@ if final_data:
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        # Use separated win_counts
         bg, tx = get_stretched_gradient(win_counts[i], max_w, mid_w)
         html_grid += f"<td style='background:{bg}; color:{tx}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
@@ -233,19 +236,36 @@ if final_data:
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
         if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
-        # Use separated lose_counts
         bg_l, tx_l = get_stretched_gradient(lose_counts[r], max_l, mid_l)
         html_grid += f"<td style='background:{bg_l}; color:{tx_l}; font-weight:bold;'>{r}</td>"
+        
         for c in WINNER_AXIS:
             wins = heatmap_wins.at[r, c]
             bg_cell, tx_cell = get_stretched_gradient(wins, max_win, mid_win) if wins > 0 else ("rgba(128,128,128,0.05)", "inherit")
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
+            
+            # --- EV Calculation with Laplace Smoothing ---
+            if games_played > 0:
+                # Add 1 to the numerator and 10 to the denominator to mathematically prevent 0%
+                p_win = (win_counts[c] + 1) / (games_played + 10)
+                p_lose = (lose_counts[r] + 1) / (games_played + 10)
+                p_box = p_win * p_lose
+                projected_future_value = p_box * remaining_pool
+            else:
+                projected_future_value = remaining_pool / 100 # Flat 1% before games start
+                
+            current_earned = sum(g['Payout'] for g in final_data if g['W'] == c and g['L'] == r)
+            total_ev = current_earned + projected_future_value
+            
             html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:60px;'>"
             html_grid += f"<b>{owner}</b>"
             if wins > 0:
-                # Apply Proper Grammar for Win vs Wins
                 win_label = "Win" if wins == 1 else "Wins"
                 html_grid += f"<br><span style='font-size: 0.65rem; opacity: 0.8;'>({wins} {win_label})</span>"
+            
+            # Display Projected Value in Green
+            html_grid += f"<br><span style='color: #2e7d32; font-size: 0.85rem; font-weight: 800;'>Est: ${total_ev:.2f}</span>"
+            
             html_grid += "</td>"
         html_grid += "</tr>"
     html_grid += "</table></div>"
