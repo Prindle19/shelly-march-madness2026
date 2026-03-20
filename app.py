@@ -40,16 +40,26 @@ def get_payout_info(date_str):
     rnd = schedule.get(date_str, "1st Round")
     return PAYOUT_MAP.get(rnd, 50), rnd
 
-# --- 2. COLOR ENGINE ---
-def get_fire_ice_color(val, mx):
-    """Interpolates between #05FFFF (Ice) and #FF0505 (Fire)"""
-    ratio = val / mx if mx > 0 else 0
-    # Ice: R:5, G:255, B:255
-    # Fire: R:255, G:5, B:5
-    r = int(5 + (250 * ratio))
-    g = int(255 - (250 * ratio))
-    b = int(255 - (250 * ratio))
-    return f"rgb({r}, {g}, {b})"
+# --- 2. ADVANCED COLOR ENGINE ---
+def get_natural_break_color(val, mx, mid):
+    """3-Point Gradient: Ice (#05FFFF) -> Neutral -> Fire (#FF0505)"""
+    if val == mid:
+        return "rgba(128, 128, 128, 0.15)" # Neutral Middle
+    
+    if val > mid:
+        # Scale between Neutral and Max Fire
+        ratio = (val - mid) / (mx - mid) if (mx - mid) > 0 else 0
+        r = int(128 + (127 * ratio))
+        g = int(128 - (123 * ratio))
+        b = int(128 - (123 * ratio))
+        return f"rgb({r}, {g}, {b})"
+    else:
+        # Scale between Min Ice and Neutral
+        ratio = val / mid if mid > 0 else 0
+        r = int(5 + (123 * ratio))
+        g = int(255 - (127 * ratio))
+        b = int(255 - (127 * ratio))
+        return f"rgb({r}, {g}, {b})"
 
 # --- 3. DATA ENGINE ---
 @st.cache_data(ttl=60)
@@ -100,7 +110,7 @@ def fetch_tournament_data():
 st.title("🏀 Shelly's 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# STANDINGS
+# LEADERBOARD
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -118,7 +128,7 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# HISTORY (Chronological)
+# GAME HISTORY
 if final_data:
     st.divider()
     st.header("📜 Game History")
@@ -127,47 +137,47 @@ if final_data:
             st.write(f"**Date:** {g['Date']} ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
-# STATS & GRID
+# STATISTICS & GRID
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
     
-    w_digits = [g['W'] for g in final_data]
-    l_digits = [g['L'] for g in final_data]
-    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
-    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
+    all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
+    digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
     
-    max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
-
-    # Frequency Breakdowns
-    st.subheader("🔥 Fire & ❄️ Ice Digits")
-    w_sorted = w_counts.sort_values(ascending=False)
-    l_sorted = l_counts.sort_values(ascending=False)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.write("**WINNER FREQUENCY**")
-        html_w = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
-        for d, c in w_sorted.head(5).items(): html_w += f"<div style='background:{get_fire_ice_color(c, max_w)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
-        html_w += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
-        for d, c in w_sorted.tail(5).items(): html_w += f"<div style='background:{get_fire_ice_color(c, max_w)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
-        html_w += "</div>"
-        st.markdown(html_w, unsafe_allow_html=True)
-
-    with c2:
-        st.write("**LOSER FREQUENCY**")
-        html_l = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
-        for d, c in l_sorted.head(5).items(): html_l += f"<div style='background:{get_fire_ice_color(c, max_l)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
-        html_l += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
-        for d, c in l_sorted.tail(5).items(): html_l += f"<div style='background:{get_fire_ice_color(c, max_l)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
-        html_l += "</div>"
-        st.markdown(html_l, unsafe_allow_html=True)
+    # Calculate Natural Breaks
+    max_c = digit_counts.max() or 1
+    mid_c = digit_counts.median() or (max_c / 2)
+    
+    st.subheader("🔥 Fire & ❄️ Ice Digits (Median Neutral)")
+    d_sorted = digit_counts.sort_values(ascending=False)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**TOP 5 HOT**")
+        html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for digit, count in d_sorted.head(5).items():
+            bg = get_natural_break_color(count, max_c, mid_c)
+            html_h += f"<div style='background:{bg}; color:black; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
+        html_h += "</div>"
+        st.markdown(html_h, unsafe_allow_html=True)
+    
+    with col2:
+        st.write("**BOTTOM 5 COLD**")
+        html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for digit, count in d_sorted.tail(5).items():
+            bg = get_natural_break_color(count, max_c, mid_c)
+            html_c += f"<div style='background:{bg}; color:black; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
+        html_c += "</div>"
+        st.markdown(html_c, unsafe_allow_html=True)
 
     # GRID
     st.subheader("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
     for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
-    max_cell = heatmap_wins.max().max() or 1
+    
+    max_win = heatmap_wins.max().max() or 1
+    mid_win = max_win / 2
 
     html_grid = """
     <style>
@@ -183,22 +193,22 @@ if final_data:
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        bg = get_fire_ice_color(w_counts[i], max_w)
+        bg = get_natural_break_color(digit_counts[i], max_c, mid_c)
         html_grid += f"<td style='background:{bg}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
 
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
         if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
-        bg_l = get_fire_ice_color(l_counts[r], max_l)
+        bg_l = get_natural_break_color(digit_counts[r], max_c, mid_c)
         html_grid += f"<td style='background:{bg_l}; font-weight:bold;'>{r}</td>"
         for c in WINNER_AXIS:
-            val = heatmap_wins.at[r, c]
+            wins = heatmap_wins.at[r, c]
+            bg_cell = get_natural_break_color(wins, max_win, mid_win) if wins > 0 else "rgba(128,128,128,0.05)"
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
-            bg_cell = get_fire_ice_color(val, max_cell)
             html_grid += f"<td style='background:{bg_cell}; min-width:85px; height:60px;'>"
             html_grid += f"<b>{owner}</b>"
-            if val > 0: html_grid += f"<br>({val} wins)"
+            if wins > 0: html_grid += f"<br>({wins} wins)"
             html_grid += "</td>"
         html_grid += "</tr>"
 
