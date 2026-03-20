@@ -7,7 +7,7 @@ import pytz
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="2026 Box Pool - DEV", page_icon="🏀", layout="centered")
 
-# Your grid data as mapped from the spreadsheet
+# Grid data from your spreadsheet
 GRID_DATA = {
     '8': {'3': 'Chrissy Gonzalez', '2': 'Jay & Larry', '1': 'CKel', '6': 'Ciara Conlon', '8': 'Syd & Drew', '9': 'Gene M', '5': 'Babeh 😘', '0': 'Smelly', '7': 'Tim McNelis', '4': 'Fuck Fatboy'},
     '7': {'3': 'Tim McNelis', '2': 'Denis', '1': 'Jenna Apgar', '6': 'Mom & Dad', '8': 'Craig McNelis', '9': 'Sam Greenstein', '5': 'Babeh 😘', '0': 'Loretta Kelly', '7': 'Lou T', '4': 'Mr. B'},
@@ -21,14 +21,10 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
-# Official Payout tiers from your provided table
+# Payout tiers
 PAYOUT_MAP = {
-    "1st Round": 50,
-    "2nd Round": 100,
-    "Sweet 16": 200,
-    "Elite 8": 400,
-    "Final 4": 800,
-    "Championship Final": 1500
+    "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
+    "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
 }
 
 def get_payout_info(date_str):
@@ -56,29 +52,33 @@ def fetch_tournament_data():
         pay, rnd = get_payout_info(d_str)
         url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={d_str}"
         try:
-            resp = requests.get(url)
-            data = resp.json()
+            data = requests.get(url).json()
             for ev in data.get('events', []):
                 status = ev['status']['type']['name']
                 comp = ev['competitions'][0]
                 h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
+                
+                # Extract Seeds
+                h_seed = h.get('curatedRank', {}).get('current', '')
+                a_seed = a.get('curatedRank', {}).get('current', '')
+                h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed and h_seed < 25 else h['team']['shortDisplayName']
+                a_disp = f"({a_seed}) {a['team']['shortDisplayName']}" if a_seed and a_seed < 25 else a['team']['shortDisplayName']
+                
                 h_s, a_s = int(h['score']), int(a['score'])
                 
-                # Check for Final status
                 if "STATUS_FINAL" in status:
                     final_games.append({
                         "Winner": GRID_DATA.get(str(a_s%10), {}).get(str(h_s%10), "??"),
                         "Payout": pay,
                         "H": h_s % 10, "A": a_s % 10,
-                        "Matchup": f"{a['team']['shortDisplayName']} @ {h['team']['shortDisplayName']}",
+                        "Matchup": f"{a_disp} @ {h_disp}",
                         "Result": f"{a_s}-{h_s}",
                         "Date": current.strftime("%m/%d")
                     })
-                # Check for Live status
                 elif "STATUS_IN_PROGRESS" in status or "STATUS_HALFTIME" in status:
                     live_games.append({
-                        "Matchup": f"{a['team']['shortDisplayName']} @ {h['team']['shortDisplayName']}",
+                        "Matchup": f"{a_disp} @ {h_disp}",
                         "Score": f"{a_s}-{h_s}",
                         "Time": ev['status']['type']['shortDetail'],
                         "Leader": GRID_DATA.get(str(a_s%10), {}).get(str(h_s%10), "??"),
@@ -92,19 +92,15 @@ def fetch_tournament_data():
 st.title("🏀 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# LEADERBOARD (Pinned to Top)
+# LEADERBOARD
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
     lead = df_f.groupby("Winner").agg(Wins=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
-    
-    # Currency Formatting for Standings
     lead['Total'] = lead['Total'].map('${:,.0f}'.format)
     st.dataframe(lead, use_container_width=True, hide_index=True)
-else:
-    st.info("Tournament tracking active. Waiting for final scores.")
 
-# LIVE TRACKER (Only displays if games are active)
+# LIVE TRACKER
 if live_data:
     st.header("⏳ Live Games")
     for g in live_data:
@@ -112,42 +108,26 @@ if live_data:
             c1, c2 = st.columns([2, 1])
             c1.markdown(f"**{g['Matchup']}**")
             c1.write(f"{g['Score']} | {g['Time']}")
-            # Currency Formatting for live potential
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# HIT FREQUENCY HEATMAP
+# HEATMAP (Fixed to prevent ImportError)
 if final_data:
     st.divider()
     st.header("🔥 Hit Frequency")
-    
-    # Build 10x10 Heatmap Grid
     heatmap = pd.DataFrame(0, index=range(10), columns=range(10))
     for g in final_data:
         heatmap.at[g['A'], g['H']] += 1
-    
-    st.write("Grid Stats (Away Digit vs Home Digit)")
-    # Using 'Oranges' for the heat feel
-    st.dataframe(heatmap.style.background_gradient(cmap='Oranges'), use_container_width=True)
+    st.write("Grid Stats (Away vs Home)")
+    # Using built-in pandas styling that doesn't require matplotlib
+    st.dataframe(heatmap, use_container_width=True)
 
-    # Hot/Cold Highlights
-    all_digits = [g['H'] for g in final_data] + [g['A'] for g in final_data]
-    if all_digits:
-        digit_counts = pd.Series(all_digits).value_counts().reindex(range(10), fill_value=0)
-        h_col, c_col = st.columns(2)
-        h_col.success(f"🔥 Hottest: **{digit_counts.idxmax()}** ({digit_counts.max()} hits)")
-        c_col.error(f"❄️ Coldest: **{digit_counts.idxmin()}** ({digit_counts.min()} hits)")
-
-# GAME HISTORY
+# HISTORY
 if final_data:
     st.divider()
     st.header("📜 Game History")
     for g in reversed(final_data):
-        # Currency formatting for the payout label
         st.write(f"**{g['Date']}**: {g['Matchup']} ({g['Result']}) → **{g['Winner']}** :green[(${g['Payout']})]")
 
-# REFRESH TRIGGER
 if st.button('Update Scores'):
     st.cache_data.clear()
     st.rerun()
-
-st.caption("Data provided via ESPN Public API. Standings are cumulative based on final scores.")
