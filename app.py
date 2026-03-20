@@ -31,6 +31,12 @@ PAYOUT_MAP = {
 
 TOTAL_PRIZE_POOL = 9500
 
+# Estimated historical probabilities for NCAA basketball final score digits
+HISTORICAL_PROBS = {
+    '0': 0.11, '1': 0.13, '2': 0.11, '3': 0.10, '4': 0.09,
+    '5': 0.12, '6': 0.09, '7': 0.09, '8': 0.09, '9': 0.07
+}
+
 def get_payout_info(date_str):
     schedule = {
         "20260319": "1st Round", "20260320": "1st Round",
@@ -121,7 +127,6 @@ def fetch_tournament_data():
         except: pass
         current += timedelta(days=1)
         
-    # Sort both the final games and live games lists purely by the exact UTC timestamp
     final_games.sort(key=lambda x: x.get('GameTime', 0))
     live_games.sort(key=lambda x: x.get('GameTime', 0))
     return final_games, live_games
@@ -162,7 +167,6 @@ if final_data:
     st.divider()
     st.header("📈 Tournament Statistics & Expected Value")
     
-    # Mathematical Variables for EV
     games_played = len(final_data)
     awarded_prizes = sum(g['Payout'] for g in final_data)
     remaining_pool = TOTAL_PRIZE_POOL - awarded_prizes
@@ -226,7 +230,7 @@ if final_data:
     
     with st.expander("ℹ️ What does 'Est: $' mean? (Click to read)"):
         st.write("""
-        This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by looking at the current tournament hit rate of your Winner Digit multiplied by the hit rate of your Loser Digit, applied to the remaining unawarded prize pool. *(Note: We use statistical "smoothing" so that even if a number hasn't hit yet, it never drops to a 0% probability—keeping everyone's board alive!)*
+        This is the mathematically projected final value of your box. It takes the money you have *already won* and adds your expected future winnings. Future winnings are estimated dynamically by blending **Historical NCAA Probabilities** with the **Current Tournament Hit Rates**. Before the tournament starts, the model relies 100% on history. As more games are played, the model shifts its weight toward the actual results of the current year.
         """)
     
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
@@ -263,25 +267,31 @@ if final_data:
             bg_cell, tx_cell = get_stretched_gradient(wins, max_win, mid_win) if wins > 0 else ("rgba(128,128,128,0.05)", "inherit")
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
             
-            # --- EV Calculation with Laplace Smoothing ---
-            if games_played > 0:
-                p_win = (win_counts[c] + 1) / (games_played + 10)
-                p_lose = (lose_counts[r] + 1) / (games_played + 10)
-                p_box = p_win * p_lose
-                projected_future_value = p_box * remaining_pool
-            else:
-                projected_future_value = remaining_pool / 100 
+            # --- EV Calculation with Dynamic Blending ---
+            weight_current = games_played / 63.0
+            weight_hist = 1.0 - weight_current
+            
+            p_win_current = win_counts[c] / games_played if games_played > 0 else 0
+            p_win_blended = (p_win_current * weight_current) + (HISTORICAL_PROBS[c] * weight_hist)
+            
+            p_lose_current = lose_counts[r] / games_played if games_played > 0 else 0
+            p_lose_blended = (p_lose_current * weight_current) + (HISTORICAL_PROBS[r] * weight_hist)
+            
+            p_box = p_win_blended * p_lose_blended
+            projected_future_value = p_box * remaining_pool
                 
             current_earned = sum(g['Payout'] for g in final_data if g['W'] == c and g['L'] == r)
             total_ev = current_earned + projected_future_value
             
+            # Use tx_cell directly for entire cell text including EV, preventing hard-to-read overrides.
             html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:60px;'>"
             html_grid += f"<b>{owner}</b>"
             if wins > 0:
                 win_label = "Win" if wins == 1 else "Wins"
                 html_grid += f"<br><span style='font-size: 0.65rem; opacity: 0.8;'>({wins} {win_label})</span>"
             
-            html_grid += f"<br><span style='color: #2e7d32; font-size: 0.85rem; font-weight: 800;'>Est: ${total_ev:.2f}</span>"
+            # Remove the fixed green color override to respect parent tx_cell color.
+            html_grid += f"<br><span style='font-size: 0.85rem; font-weight: 800;'>Est: ${total_ev:.2f}</span>"
             
             html_grid += "</td>"
         html_grid += "</tr>"
