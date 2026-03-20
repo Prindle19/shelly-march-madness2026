@@ -145,27 +145,61 @@ if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
     
-    all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
-    digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
-    max_c = digit_counts.max() or 1
-    mid_c = digit_counts.median() or (max_c / 2)
+    # Separate the Winning and Losing digits
+    win_digits = [g['W'] for g in final_data]
+    lose_digits = [g['L'] for g in final_data]
+    
+    win_counts = pd.Series(win_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
+    lose_counts = pd.Series(lose_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
+    
+    max_w = win_counts.max() or 1
+    mid_w = win_counts.median() or (max_w / 2)
+    
+    max_l = lose_counts.max() or 1
+    mid_l = lose_counts.median() or (max_l / 2)
     
     st.subheader("🔥 Fire & ❄️ Ice Digits")
-    d_sorted = digit_counts.sort_values(ascending=False)
+    
+    # Winner Digits Display
+    st.markdown("##### Winner Digits")
+    w_sorted = win_counts.sort_values(ascending=False)
     col1, col2 = st.columns(2)
     with col1:
         st.write("**TOP 5 HOT**")
         html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.head(5).items():
-            bg, tx = get_stretched_gradient(count, max_c, mid_c)
+        for digit, count in w_sorted.head(5).items():
+            bg, tx = get_stretched_gradient(count, max_w, mid_w)
             html_h += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
         html_h += "</div>"
         st.markdown(html_h, unsafe_allow_html=True)
     with col2:
         st.write("**BOTTOM 5 COLD**")
         html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.tail(5).items():
-            bg, tx = get_stretched_gradient(count, max_c, mid_c)
+        for digit, count in w_sorted.tail(5).items():
+            bg, tx = get_stretched_gradient(count, max_w, mid_w)
+            html_c += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
+        html_c += "</div>"
+        st.markdown(html_c, unsafe_allow_html=True)
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Loser Digits Display
+    st.markdown("##### Loser Digits")
+    l_sorted = lose_counts.sort_values(ascending=False)
+    col3, col4 = st.columns(2)
+    with col3:
+        st.write("**TOP 5 HOT**")
+        html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for digit, count in l_sorted.head(5).items():
+            bg, tx = get_stretched_gradient(count, max_l, mid_l)
+            html_h += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
+        html_h += "</div>"
+        st.markdown(html_h, unsafe_allow_html=True)
+    with col4:
+        st.write("**BOTTOM 5 COLD**")
+        html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for digit, count in l_sorted.tail(5).items():
+            bg, tx = get_stretched_gradient(count, max_l, mid_l)
             html_c += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid rgba(128,128,128,0.3);'><b>{digit}</b> ({count})</div>"
         html_c += "</div>"
         st.markdown(html_c, unsafe_allow_html=True)
@@ -191,14 +225,16 @@ if final_data:
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        bg, tx = get_stretched_gradient(digit_counts[i], max_c, mid_c)
+        # Use separated win_counts
+        bg, tx = get_stretched_gradient(win_counts[i], max_w, mid_w)
         html_grid += f"<td style='background:{bg}; color:{tx}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
 
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
         if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
-        bg_l, tx_l = get_stretched_gradient(digit_counts[r], max_c, mid_c)
+        # Use separated lose_counts
+        bg_l, tx_l = get_stretched_gradient(lose_counts[r], max_l, mid_l)
         html_grid += f"<td style='background:{bg_l}; color:{tx_l}; font-weight:bold;'>{r}</td>"
         for c in WINNER_AXIS:
             wins = heatmap_wins.at[r, c]
