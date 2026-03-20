@@ -7,7 +7,7 @@ import pytz
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
 
-# Randomized sequence for the grid axes
+# Randomized sequence for the grid axes [cite: 2]
 WINNER_AXIS = ['3', '2', '1', '6', '8', '9', '5', '0', '7', '4']
 LOSER_AXIS = ['8', '7', '3', '0', '4', '2', '9', '5', '1', '6']
 
@@ -24,6 +24,7 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
+# Payout tiers [cite: 1]
 PAYOUT_MAP = {
     "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
     "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
@@ -89,7 +90,7 @@ def fetch_tournament_data():
 st.title("🏀 Shelly's 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# LEADERBOARD
+# LEADERBOARD [cite: 1]
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -125,11 +126,19 @@ if final_data:
     all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
     digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
     max_count = digit_counts.max() or 1
+    min_count = digit_counts.min() or 0
     
-    def get_color(val, mx):
-        return f"rgba(255, 102, 0, {min(val/mx, 1.0)})" if val > 0 else "transparent"
+    # Color logic: Hot (Red/Orange) vs Cold (Ice Blue)
+    def get_fire_ice_color(val, mx, mn):
+        if val == 0: return "rgba(0, 153, 255, 0.4)" # Zero hits is deep ice
+        # Map high hits to red, low hits to blue
+        if val >= (mx * 0.7): # Hot
+            opacity = min(val / mx, 1.0)
+            return f"rgba(255, 69, 0, {opacity})"
+        else: # Cold
+            opacity = 1.0 - (val / mx)
+            return f"rgba(0, 191, 255, {max(opacity, 0.2)})"
 
-    # Unified Hot/Cold Digits (Top 5 / Bottom 5)
     st.subheader("🔥 Hot Digits / ❄️ Cold Digits")
     d_sorted = digit_counts.sort_values(ascending=False)
     
@@ -138,7 +147,7 @@ if final_data:
         st.write("**TOP 5 HOT**")
         html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in d_sorted.head(5).items():
-            html_h += f"<div style='background:{get_color(count, max_count)}; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
+            html_h += f"<div style='background:{get_fire_ice_color(count, max_count, min_count)}; color:white; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
         html_h += "</div>"
         st.markdown(html_h, unsafe_allow_html=True)
     
@@ -146,7 +155,7 @@ if final_data:
         st.write("**BOTTOM 5 COLD**")
         html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         for digit, count in d_sorted.tail(5).items():
-            html_c += f"<div style='background:{get_color(count, max_count)}; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
+            html_c += f"<div style='background:{get_fire_ice_color(count, max_count, min_count)}; color:white; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
         html_c += "</div>"
         st.markdown(html_c, unsafe_allow_html=True)
 
@@ -166,41 +175,43 @@ if final_data:
         .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; color: inherit; }
         .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
-        .header-digit { font-weight: bold; font-size: 0.8rem; }
+        .header-digit { font-weight: bold; font-size: 0.8rem; color: white; }
         .side-label { background-color: #31333F !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; text-transform: uppercase; border: none !important; }
+        .cell-name { font-weight: bold; display: block; }
+        .cell-wins { font-size: 0.65rem; opacity: 0.8; display: block; margin-top: 2px; }
     </style>
     <div class='grid-container'>
     <table class='mm-table'>
     """
 
-    # ROW 1: GAME WINNER (Merged Header)
+    # ROW 1: GAME WINNER (Merged Header) [cite: 2]
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     
     # ROW 2: Winner Digits (Random Order)
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        opacity = min(w_orig[i] / max_count, 1.0) if w_orig[i] > 0 else 0
-        html_grid += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {opacity});'>{i}</td>"
+        bg = get_fire_ice_color(w_orig[i], max_count, min_count)
+        html_grid += f"<td class='header-digit' style='background-color: {bg};'>{i}</td>"
     html_grid += "</tr>"
 
-    # ROWS: Side Label + Digits + Randomized Cells
+    # ROWS: Side Label + Digits + Randomized Cells [cite: 2]
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
         if idx == 0:
             html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
         
-        l_opacity = min(l_orig[r] / max_count, 1.0) if l_orig[r] > 0 else 0
-        html_grid += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {l_opacity});'>{r}</td>"
+        bg_l = get_fire_ice_color(l_orig[r], max_count, min_count)
+        html_grid += f"<td class='header-digit' style='background-color: {bg_l};'>{r}</td>"
         
         for c in WINNER_AXIS:
             val = heatmap_wins.at[r, c]
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
-            c_opacity = min(val / max_cell, 1.0) if val > 0 else 0
-            txt_color = "white" if c_opacity > 0.5 else "inherit"
+            bg_cell = get_fire_ice_color(val, max_cell, 0) if val > 0 else "rgba(0, 191, 255, 0.05)"
+            txt_color = "white" if val > 0 else "inherit"
             
-            html_grid += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 85px; height: 60px;'>"
-            html_grid += f"<b>{owner}</b>"
-            if val > 0: html_grid += f"<br>({val} wins)"
+            html_grid += f"<td style='background-color: {bg_cell}; color: {txt_color}; min-width: 85px; height: 60px;'>"
+            html_grid += f"<span class='cell-name'>{owner}</span>"
+            if val > 0: html_grid += f"<span class='cell-wins'>({val} wins)</span>"
             html_grid += "</td>"
         html_grid += "</tr>"
 
