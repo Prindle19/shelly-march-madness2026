@@ -59,11 +59,10 @@ def fetch_tournament_data():
                 h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
                 
-                # Extract Seeds
                 h_seed = h.get('curatedRank', {}).get('current', '')
                 a_seed = a.get('curatedRank', {}).get('current', '')
-                h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed and h_seed < 25 else h['team']['shortDisplayName']
-                a_disp = f"({a_seed}) {a['team']['shortDisplayName']}" if a_seed and a_seed < 25 else a['team']['shortDisplayName']
+                h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed and h_seed <= 16 else h['team']['shortDisplayName']
+                a_disp = f"({a_seed}) {a['team']['shortDisplayName']}" if a_seed and a_seed <= 16 else a['team']['shortDisplayName']
                 
                 h_s, a_s = int(h['score']), int(a['score'])
                 
@@ -92,7 +91,7 @@ def fetch_tournament_data():
 st.title("🏀 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# LEADERBOARD
+# LEADERBOARD (Pinned to Top)
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -110,23 +109,72 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# HEATMAP (Fixed to prevent ImportError)
-if final_data:
-    st.divider()
-    st.header("🔥 Hit Frequency")
-    heatmap = pd.DataFrame(0, index=range(10), columns=range(10))
-    for g in final_data:
-        heatmap.at[g['A'], g['H']] += 1
-    st.write("Grid Stats (Away vs Home)")
-    # Using built-in pandas styling that doesn't require matplotlib
-    st.dataframe(heatmap, use_container_width=True)
-
-# HISTORY
+# GAME HISTORY (Now ABOVE Statistics)
 if final_data:
     st.divider()
     st.header("📜 Game History")
     for g in reversed(final_data):
         st.write(f"**{g['Date']}**: {g['Matchup']} ({g['Result']}) → **{g['Winner']}** :green[(${g['Payout']})]")
+
+# STATISTICS SECTION (Hot/Cold first, then Heatmapped Grid)
+if final_data:
+    st.divider()
+    st.header("📈 Tournament Statistics")
+    
+    # 1. Hot and Cold Numbers (Frequency Tally)
+    h_digits = [g['H'] for g in final_data]
+    a_digits = [g['A'] for g in final_data]
+    
+    h_counts = pd.Series(h_digits).value_counts().reindex(range(10), fill_value=0)
+    a_counts = pd.Series(a_digits).value_counts().reindex(range(10), fill_value=0)
+    
+    col_h, col_a = st.columns(2)
+    with col_h:
+        st.subheader("🔥 Home Digits")
+        st.write(f"Hottest: **{h_counts.idxmax()}** | Coldest: **{h_counts.idxmin()}**")
+    with col_a:
+        st.subheader("❄️ Away Digits")
+        st.write(f"Hottest: **{a_counts.idxmax()}** | Coldest: **{a_counts.idxmin()}**")
+
+    # 2. Fully Heatmapped Grid (Custom CSS)
+    st.subheader("🔥 Grid Heatmap")
+    
+    heatmap = pd.DataFrame(0, index=range(10), columns=range(10))
+    for g in final_data:
+        heatmap.at[g['A'], g['H']] += 1
+        
+    def get_color(val, max_val):
+        if val == 0: return "#ffffff"
+        opacity = min(val / max_val, 1.0)
+        return f"rgba(255, 102, 0, {opacity})"
+
+    max_val = heatmap.max().max() if heatmap.max().max() > 0 else 1
+    
+    # Building HTML Table for Heatmap
+    html = "<table style='width:100%; border-collapse: collapse; text-align:center; font-family:sans-serif;'>"
+    # Header Row
+    html += "<tr><td style='border:none;'></td><td colspan='10' style='font-weight:bold; background:#003366; color:white;'>HOME DIGIT</td></tr><tr><td style='border:none;'></td>"
+    for i in range(10):
+        # Header Heatmap (X-Axis)
+        bg = get_color(h_counts[i], h_counts.max())
+        html += f"<td style='background:{bg}; font-weight:bold; border:1px solid #ddd; padding:5px;'>{i}</td>"
+    html += "</tr>"
+    
+    # Rows
+    for r in range(10):
+        # Y-Axis Header Heatmap
+        bg_y = get_color(a_counts[r], a_counts.max())
+        html += f"<tr><td style='background:{bg_y}; font-weight:bold; border:1px solid #ddd; width:30px;'>{r}</td>"
+        for c in range(10):
+            val = heatmap.at[r, c]
+            bg_cell = get_color(val, max_val)
+            text_color = "white" if val > (max_val/2) else "black"
+            html += f"<td style='background:{bg_cell}; color:{text_color}; border:1px solid #ddd; padding:8px;'>{val if val > 0 else ''}</td>"
+        html += "</tr>"
+    html += "</table>"
+    
+    st.markdown(html, unsafe_allow_html=True)
+    st.caption("Heatmap intensity based on number of final score occurrences. Darker = Hotter.")
 
 if st.button('Update Scores'):
     st.cache_data.clear()
