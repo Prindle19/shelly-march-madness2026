@@ -90,21 +90,40 @@ def fetch_tournament_data():
                 
                 if h_s > a_s: w_d, l_d = h_s % 10, a_s % 10
                 else: w_d, l_d = a_s % 10, h_s % 10
+                
+                # --- EXTRACT AND CONVERT EXACT GAME TIME ---
+                dt_raw = ev.get('date')
+                if dt_raw:
+                    dt = pd.to_datetime(dt_raw)
+                    if dt.tz is None:
+                        dt = dt.tz_localize('UTC')
+                    dt_est = dt.tz_convert('US/Eastern')
+                    sort_time = dt_est.timestamp()
+                    display_time = dt_est.strftime("%I:%M %p").lstrip('0')
+                else:
+                    sort_time = 0
+                    display_time = "TBD"
 
                 if "STATUS_FINAL" in status:
                     final_games.append({
                         "Winner": GRID_DATA.get(str(l_d), {}).get(str(w_d), "??"),
                         "Payout": pay, "W": str(w_d), "L": str(l_d), "Date": current.strftime("%m/%d"),
+                        "GameTime": sort_time, "DisplayTime": display_time,
                         "Matchup": f"{a_disp} @ {h_disp}", "Result": f"{a_s}-{h_s}", "Round": rnd
                     })
                 elif "STATUS_IN_PROGRESS" in status or "STATUS_HALFTIME" in status:
                     live_games.append({
                         "Matchup": f"{a_disp} @ {h_disp}", "Score": f"{a_s}-{h_s}",
                         "Time": ev['status']['type']['shortDetail'],
+                        "GameTime": sort_time, "DisplayTime": display_time,
                         "Leader": GRID_DATA.get(str(l_d), {}).get(str(w_d), "??"), "Potential": pay
                     })
         except: pass
         current += timedelta(days=1)
+        
+    # Sort both the final games and live games lists purely by the exact UTC timestamp
+    final_games.sort(key=lambda x: x.get('GameTime', 0))
+    live_games.sort(key=lambda x: x.get('GameTime', 0))
     return final_games, live_games
 
 # --- 4. UI DISPLAY ---
@@ -126,7 +145,7 @@ if live_data:
         with st.container(border=True):
             c1, c2 = st.columns([2, 1])
             c1.markdown(f"**{g['Matchup']}**")
-            c1.write(f"{g['Score']} | {g['Time']}")
+            c1.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
 # GAME HISTORY
@@ -135,7 +154,7 @@ if final_data:
     st.header("📜 Game History")
     for g in final_data:
         with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} ({g['Result']})", expanded=False):
-            st.write(f"**Date:** {g['Date']} ({g['Round']})")
+            st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
 # STATISTICS & GRID
@@ -246,13 +265,12 @@ if final_data:
             
             # --- EV Calculation with Laplace Smoothing ---
             if games_played > 0:
-                # Add 1 to the numerator and 10 to the denominator to mathematically prevent 0%
                 p_win = (win_counts[c] + 1) / (games_played + 10)
                 p_lose = (lose_counts[r] + 1) / (games_played + 10)
                 p_box = p_win * p_lose
                 projected_future_value = p_box * remaining_pool
             else:
-                projected_future_value = remaining_pool / 100 # Flat 1% before games start
+                projected_future_value = remaining_pool / 100 
                 
             current_earned = sum(g['Payout'] for g in final_data if g['W'] == c and g['L'] == r)
             total_ev = current_earned + projected_future_value
@@ -263,7 +281,6 @@ if final_data:
                 win_label = "Win" if wins == 1 else "Wins"
                 html_grid += f"<br><span style='font-size: 0.65rem; opacity: 0.8;'>({wins} {win_label})</span>"
             
-            # Display Projected Value in Green
             html_grid += f"<br><span style='color: #2e7d32; font-size: 0.85rem; font-weight: 800;'>Est: ${total_ev:.2f}</span>"
             
             html_grid += "</td>"
