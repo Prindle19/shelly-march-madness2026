@@ -40,10 +40,10 @@ def get_payout_info(date_str):
     rnd = schedule.get(date_str, "1st Round")
     return PAYOUT_MAP.get(rnd, 50), rnd
 
-# --- 2. ADVANCED COLOR ENGINE (DYNAMIC TEXT CONTRAST) ---
+# --- 2. DYNAMIC COLOR & GRAMMAR ENGINE ---
 def get_stretched_gradient(val, mx, mid):
     """
-    Stretches color between Ice (#05FFFF), Neutral, and Fire (#FF0505).
+    3-Point Gradient: Ice (#05FFFF) -> Neutral -> Fire (#FF0505).
     Returns (Background Color, Text Color).
     """
     if val == mid:
@@ -54,7 +54,6 @@ def get_stretched_gradient(val, mx, mid):
         r = int(128 + (127 * ratio))
         g = int(128 - (123 * ratio))
         b = int(128 - (123 * ratio))
-        # If very red, use white text
         txt = "white" if ratio > 0.4 else "black"
         return f"rgb({r}, {g}, {b})", txt
     else:
@@ -62,7 +61,6 @@ def get_stretched_gradient(val, mx, mid):
         r = int(5 + (123 * ratio))
         g = int(255 - (127 * ratio))
         b = int(255 - (127 * ratio))
-        # If very blue, use white text
         txt = "white" if ratio < 0.6 else "black"
         return f"rgb({r}, {g}, {b})", txt
 
@@ -142,10 +140,11 @@ if final_data:
             st.write(f"**Date:** {g['Date']} ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
-# STATISTICS
+# STATISTICS & GRID
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
+    
     all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
     digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
     max_c = digit_counts.max() or 1
@@ -207,7 +206,10 @@ if final_data:
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
             html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:60px;'>"
             html_grid += f"<b>{owner}</b>"
-            if wins > 0: html_grid += f"<br>({wins} wins)"
+            if wins > 0:
+                # Apply Proper Grammar for Win vs Wins
+                win_label = "Win" if wins == 1 else "Wins"
+                html_grid += f"<br><span style='font-size: 0.65rem; opacity: 0.8;'>({wins} {win_label})</span>"
             html_grid += "</td>"
         html_grid += "</tr>"
     html_grid += "</table></div>"
