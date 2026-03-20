@@ -7,7 +7,7 @@ import pytz
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
 
-# Randomized sequence for the grid axes [cite: 2]
+# Randomized sequence for the grid axes [cite: 1]
 WINNER_AXIS = ['3', '2', '1', '6', '8', '9', '5', '0', '7', '4']
 LOSER_AXIS = ['8', '7', '3', '0', '4', '2', '9', '5', '1', '6']
 
@@ -24,7 +24,6 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
-# Payout tiers [cite: 1]
 PAYOUT_MAP = {
     "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
     "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
@@ -90,7 +89,7 @@ def fetch_tournament_data():
 st.title("🏀 Shelly's 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# LEADERBOARD [cite: 1]
+# 1. LEADERBOARD
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -98,7 +97,7 @@ if final_data:
     lead['Total'] = lead['Total'].map('${:,.0f}'.format)
     st.dataframe(lead, use_container_width=True, hide_index=True)
 
-# LIVE TRACKER
+# 2. LIVE TRACKER
 if live_data:
     st.header("⏳ Live Games")
     for g in live_data:
@@ -108,7 +107,7 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# GAME HISTORY (Chronological)
+# 3. GAME HISTORY (Chronological)
 if final_data:
     st.divider()
     st.header("📜 Game History")
@@ -117,57 +116,55 @@ if final_data:
             st.write(f"**Date:** {g['Date']} ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
-# STATISTICS & GRID
+# 4. STATISTICS & GRID
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
     
-    # Combined Frequency Tally
-    all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
-    digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
-    max_count = digit_counts.max() or 1
-    min_count = digit_counts.min() or 0
+    # Winner vs Loser Frequency [cite: 1]
+    w_digits = [g['W'] for g in final_data]
+    l_digits = [g['L'] for g in final_data]
+    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
+    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
     
-    # Color logic: Hot (Red/Orange) vs Cold (Ice Blue)
-    def get_fire_ice_color(val, mx, mn):
-        if val == 0: return "rgba(0, 153, 255, 0.4)" # Zero hits is deep ice
-        # Map high hits to red, low hits to blue
-        if val >= (mx * 0.7): # Hot
-            opacity = min(val / mx, 1.0)
-            return f"rgba(255, 69, 0, {opacity})"
-        else: # Cold
-            opacity = 1.0 - (val / mx)
-            return f"rgba(0, 191, 255, {max(opacity, 0.2)})"
+    max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
 
-    st.subheader("🔥 Hot Digits / ❄️ Cold Digits")
-    d_sorted = digit_counts.sort_values(ascending=False)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**TOP 5 HOT**")
-        html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.head(5).items():
-            html_h += f"<div style='background:{get_fire_ice_color(count, max_count, min_count)}; color:white; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
-        html_h += "</div>"
-        st.markdown(html_h, unsafe_allow_html=True)
-    
-    with col2:
-        st.write("**BOTTOM 5 COLD**")
-        html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.tail(5).items():
-            html_c += f"<div style='background:{get_fire_ice_color(count, max_count, min_count)}; color:white; padding:8px 12px; border:1px solid rgba(128,128,128,0.3); border-radius:6px;'><b>{digit}</b> ({count})</div>"
-        html_c += "</div>"
-        st.markdown(html_c, unsafe_allow_html=True)
+    def get_fire_ice_color(val, mx):
+        if val == 0: return "rgba(0, 191, 255, 0.2)" # Coldest Ice
+        if val >= (mx * 0.6): # Hot Fire
+            return f"rgba(255, 69, 0, {min(val/mx, 1.0)})"
+        return f"rgba(0, 191, 255, {max(1.0 - (val/mx), 0.1)})" # Ice Fade
 
-    # --- THE RANDOMIZED HEATMAP GRID ---
+    # Stat Breakdown [cite: 14]
+    st.subheader("🔥 Hot / ❄️ Cold Breakdowns")
+    w_sorted = w_counts.sort_values(ascending=False)
+    l_sorted = l_counts.sort_values(ascending=False)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write("**WINNER DIGITS**")
+        html_wh = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in w_sorted.head(5).items(): html_wh += f"<div style='background:{get_fire_ice_color(c, max_w)}; padding:5px; border-radius:4px;'><b>{d}</b> ({c})</div>"
+        html_wh += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in w_sorted.tail(5).items(): html_wh += f"<div style='background:{get_fire_ice_color(c, max_w)}; padding:5px; border-radius:4px;'><b>{d}</b> ({c})</div>"
+        html_wh += "</div>"
+        st.markdown(html_wh, unsafe_allow_html=True)
+
+    with c2:
+        st.write("**LOSER DIGITS**")
+        html_lh = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in l_sorted.head(5).items(): html_lh += f"<div style='background:{get_fire_ice_color(c, max_l)}; padding:5px; border-radius:4px;'><b>{d}</b> ({c})</div>"
+        html_lh += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in l_sorted.tail(5).items(): html_lh += f"<div style='background:{get_fire_ice_color(c, max_l)}; padding:5px; border-radius:4px;'><b>{d}</b> ({c})</div>"
+        html_lh += "</div>"
+        st.markdown(html_lh, unsafe_allow_html=True)
+
+    # --- THE HEATMAP GRID ---
     st.subheader("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
-    for g in final_data:
-        heatmap_wins.at[g['L'], g['W']] += 1
+    for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
     
     max_cell = heatmap_wins.max().max() or 1
-    w_orig = digit_counts.reindex(WINNER_AXIS, fill_value=0)
-    l_orig = digit_counts.reindex(LOSER_AXIS, fill_value=0)
 
     html_grid = """
     <style>
@@ -175,43 +172,39 @@ if final_data:
         .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; color: inherit; }
         .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
-        .header-digit { font-weight: bold; font-size: 0.8rem; color: white; }
         .side-label { background-color: #31333F !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; text-transform: uppercase; border: none !important; }
-        .cell-name { font-weight: bold; display: block; }
-        .cell-wins { font-size: 0.65rem; opacity: 0.8; display: block; margin-top: 2px; }
     </style>
-    <div class='grid-container'>
-    <table class='mm-table'>
+    <div class='grid-container'><table class='mm-table'>
     """
 
-    # ROW 1: GAME WINNER (Merged Header) [cite: 2]
+    # ROW 1: GAME WINNER (Merged Header) [cite: 14]
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     
-    # ROW 2: Winner Digits (Random Order)
+    # ROW 2: Winner Digits
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        bg = get_fire_ice_color(w_orig[i], max_count, min_count)
-        html_grid += f"<td class='header-digit' style='background-color: {bg};'>{i}</td>"
+        bg = get_fire_ice_color(w_counts[i], max_w)
+        html_grid += f"<td style='background:{bg}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
 
-    # ROWS: Side Label + Digits + Randomized Cells [cite: 2]
+    # ROWS: Side Label + Digits + Cells
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
-        if idx == 0:
-            html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
+        if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
         
-        bg_l = get_fire_ice_color(l_orig[r], max_count, min_count)
-        html_grid += f"<td class='header-digit' style='background-color: {bg_l};'>{r}</td>"
+        bg_l = get_fire_ice_color(l_counts[r], max_l)
+        html_grid += f"<td style='background:{bg_l}; font-weight:bold;'>{r}</td>"
         
         for c in WINNER_AXIS:
             val = heatmap_wins.at[r, c]
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
-            bg_cell = get_fire_ice_color(val, max_cell, 0) if val > 0 else "rgba(0, 191, 255, 0.05)"
-            txt_color = "white" if val > 0 else "inherit"
+            # Cell Heatmap: Blends based on win count [cite: 1]
+            bg_cell = get_fire_ice_color(val, max_cell) if val > 0 else "transparent"
+            txt_color = "white" if val >= (max_cell * 0.6) else "inherit"
             
-            html_grid += f"<td style='background-color: {bg_cell}; color: {txt_color}; min-width: 85px; height: 60px;'>"
-            html_grid += f"<span class='cell-name'>{owner}</span>"
-            if val > 0: html_grid += f"<span class='cell-wins'>({val} wins)</span>"
+            html_grid += f"<td style='background:{bg_cell}; color:{txt_color}; min-width:85px; height:60px;'>"
+            html_grid += f"<b>{owner}</b>"
+            if val > 0: html_grid += f"<br>({val} wins)"
             html_grid += "</td>"
         html_grid += "</tr>"
 
