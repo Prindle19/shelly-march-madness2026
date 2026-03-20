@@ -24,7 +24,6 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
-# Payout tiers
 PAYOUT_MAP = {
     "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
     "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
@@ -117,7 +116,7 @@ if final_data:
             st.write(f"**Date:** {g['Date']} ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
-# 4. STATISTICS & GRID
+# 4. STATISTICS & RANDOMIZED GRID
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
@@ -125,18 +124,50 @@ if final_data:
     # Frequency Tally
     w_digits = [g['W'] for g in final_data]
     l_digits = [g['L'] for g in final_data]
-    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0).sort_values(ascending=False)
-    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0).sort_values(ascending=False)
+    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
+    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
     
+    max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
+    
+    def get_color(val, mx):
+        return f"rgba(255, 102, 0, {min(val/mx, 1.0)})" if val > 0 else "transparent"
+
+    # Heatmapped Hot/Cold Digits (Top 5 / Bottom 5)
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("🏆 Hot/Cold Winner Digits")
-        st.write("**Top 3 Hot:** " + ", ".join([f"**{i}** ({v})" for i, v in w_counts.head(3).items()]))
-        st.write("**Bottom 3 Cold:** " + ", ".join([f"**{i}** ({v})" for i, v in w_counts.tail(3).items()]))
+        st.subheader("🔥 Hot Winner Digits")
+        w_sorted = w_counts.sort_values(ascending=False)
+        html_w = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for digit, count in w_sorted.head(5).items():
+            html_w += f"<div style='background:{get_color(count, max_w)}; padding:5px 10px; border:1px solid #ddd; border-radius:4px;'><b>{digit}</b> ({count})</div>"
+        html_w += "</div>"
+        st.markdown(html_w, unsafe_allow_html=True)
+
     with col2:
-        st.subheader("❄️ Hot/Cold Loser Digits")
-        st.write("**Top 3 Hot:** " + ", ".join([f"**{i}** ({v})" for i, v in l_counts.head(3).items()]))
-        st.write("**Bottom 3 Cold:** " + ", ".join([f"**{i}** ({v})" for i, v in l_counts.tail(3).items()]))
+        st.subheader("❄️ Cold Winner Digits")
+        html_wc = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for digit, count in w_sorted.tail(5).items():
+            html_wc += f"<div style='background:{get_color(count, max_w)}; padding:5px 10px; border:1px solid #ddd; border-radius:4px;'><b>{digit}</b> ({count})</div>"
+        html_wc += "</div>"
+        st.markdown(html_wc, unsafe_allow_html=True)
+
+    col3, col4 = st.columns(2)
+    with col3:
+        st.subheader("🔥 Hot Loser Digits")
+        l_sorted = l_counts.sort_values(ascending=False)
+        html_lh = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for digit, count in l_sorted.head(5).items():
+            html_lh += f"<div style='background:{get_color(count, max_l)}; padding:5px 10px; border:1px solid #ddd; border-radius:4px;'><b>{digit}</b> ({count})</div>"
+        html_lh += "</div>"
+        st.markdown(html_lh, unsafe_allow_html=True)
+
+    with col4:
+        st.subheader("❄️ Cold Loser Digits")
+        html_lc = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for digit, count in l_sorted.tail(5).items():
+            html_lc += f"<div style='background:{get_color(count, max_l)}; padding:5px 10px; border:1px solid #ddd; border-radius:4px;'><b>{digit}</b> ({count})</div>"
+        html_lc += "</div>"
+        st.markdown(html_lc, unsafe_allow_html=True)
 
     # --- THE RANDOMIZED HEATMAP GRID ---
     st.subheader("🔥 Grid Heatmap")
@@ -144,43 +175,41 @@ if final_data:
     for g in final_data:
         heatmap_wins.at[g['L'], g['W']] += 1
     
-    # Recalculate original counts for axis shading
-    w_orig = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
-    l_orig = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
-    max_w, max_l = w_orig.max() or 1, l_orig.max() or 1
     max_cell = heatmap_wins.max().max() or 1
 
-    html = """
+    html_grid = """
     <style>
         .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; }
-        .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.75rem; color: inherit; }
+        .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; color: inherit; }
         .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
-        .header-main { background-color: #003366; color: white; font-weight: bold; font-size: 0.8rem; }
-        .header-digit { font-weight: bold; font-size: 0.8rem; }
-        .side-label { background-color: #003366 !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; font-size: 0.8rem; }
+        .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
+        .header-digit { font-weight: bold; background-color: rgba(128,128,128,0.1); }
+        .side-label { background-color: #31333F !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; text-transform: uppercase; border: none !important; }
+        .cell-name { font-weight: bold; display: block; }
+        .cell-wins { font-size: 0.65rem; opacity: 0.8; display: block; margin-top: 2px; }
     </style>
     <div class='grid-container'>
     <table class='mm-table'>
     """
 
     # ROW 1: GAME WINNER (Merged Header)
-    html += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
+    html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     
     # ROW 2: Winner Digits (Random Order)
-    html += "<tr><td colspan='2' style='border:none;'></td>"
+    html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        opacity = min(w_orig[i] / max_w, 1.0) if w_orig[i] > 0 else 0
-        html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {opacity});'>{i}</td>"
-    html += "</tr>"
+        opacity = min(w_counts[i] / max_w, 1.0) if w_counts[i] > 0 else 0
+        html_grid += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {opacity});'>{i}</td>"
+    html_grid += "</tr>"
 
     # ROWS: Side Label + Digits + Randomized Cells
     for idx, r in enumerate(LOSER_AXIS):
-        html += "<tr>"
+        html_grid += "<tr>"
         if idx == 0:
-            html += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
+            html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
         
-        l_opacity = min(l_orig[r] / max_l, 1.0) if l_orig[r] > 0 else 0
-        html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {l_opacity});'>{r}</td>"
+        l_opacity = min(l_counts[r] / max_l, 1.0) if l_counts[r] > 0 else 0
+        html_grid += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {l_opacity});'>{r}</td>"
         
         for c in WINNER_AXIS:
             val = heatmap_wins.at[r, c]
@@ -188,14 +217,14 @@ if final_data:
             c_opacity = min(val / max_cell, 1.0) if val > 0 else 0
             txt_color = "white" if c_opacity > 0.5 else "inherit"
             
-            html += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 85px; height: 60px;'>"
-            html += f"<b>{owner}</b>"
-            if val > 0: html += f"<br>({val} wins)"
-            html += "</td>"
-        html += "</tr>"
+            html_grid += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 85px; height: 60px;'>"
+            html_grid += f"<span class='cell-name'>{owner}</span>"
+            if val > 0: html_grid += f"<span class='cell-wins'>({val} wins)</span>"
+            html_grid += "</td>"
+        html_grid += "</tr>"
 
-    html += "</table></div>"
-    st.markdown(html, unsafe_allow_html=True)
+    html_grid += "</table></div>"
+    st.markdown(html_grid, unsafe_allow_html=True)
 
 if st.button('Update Scores'):
     st.cache_data.clear()
