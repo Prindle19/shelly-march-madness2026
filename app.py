@@ -16,7 +16,7 @@ GRID_DATA = {
     '2': {'3': 'Amanda Fahey', '2': 'Shelly', '1': 'PD', '6': 'Tim Callahan', '8': 'Terzis', '9': 'Fuck Fatboy', '5': 'Keith McTarsney', '0': 'Rob Farr', '7': 'Marty / Tommy', '4': 'Kelly Bradley'},
     '9': {'3': 'Lou T', '2': 'CKel', '1': 'Frank D', '6': 'Meg', '8': 'Tommy Scanlon', '9': 'Pat Repoli', '5': 'Al', '0': 'Sean Lynch', '7': 'Fuck Fatboy', '4': 'Alan Lapa'},
     '5': {'3': 'Maureen McTarnsey', '2': 'Gus', '1': 'Billy Sullivan', '6': 'Mike C', '8': 'Dan West', '9': 'Ashling', '5': 'Chris Murray', '0': 'Irv', '7': 'Amanda Fahey', '4': 'Justin Yuka'},
-    '1': {'3': 'Lloyd', '2': 'Ferro', '1': 'Tommy B', '6': 'Tim McNelis', '8': 'CKel', '9': 'Greg Doc', '5': 'Jardonne', '0': 'Sean Wohltman', '7': 'Mike/Eric/Matt', '4': 'Chris Murray'},
+    '1': {'3': 'Lloyd', '2': 'Ferro', '1': 'Tommy B', '6': 'Tim McNelis', '8': 'CKel', '9': 'Greg Doc', '5': 'Jardonne', '0': 'Sean Wohltman', '7': 'Banky/Doc', '4': 'Chris Murray'},
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
@@ -126,7 +126,7 @@ if final_data:
     col1.success(f"🔥 Hot Winner: **{w_counts.idxmax()}** ({w_counts.max()} hits)")
     col2.error(f"❄️ Cold Loser: **{l_counts.idxmin()}** ({l_counts.min()} hits)")
 
-    # --- ADVANCED HTML GRID ---
+    # --- UPDATED HTML GRID ---
     st.subheader("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=range(10), columns=range(10))
     for g in final_data:
@@ -135,24 +135,23 @@ if final_data:
     max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
     max_cell = heatmap_wins.max().max() or 1
 
-    # CSS that respects Streamlit Light/Dark themes
     html = """
     <style>
-        .grid-container { overflow-x: auto; margin-top: 20px; }
-        .mm-table { width: 100%; min-width: 850px; border-collapse: collapse; font-family: sans-serif; font-size: 0.75rem; color: inherit; }
-        .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 8px; text-align: center; vertical-align: middle; }
-        .header-main { background-color: #003366; color: white; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; }
-        .header-digit { font-weight: bold; background-color: rgba(128,128,128,0.1); }
-        .side-label { background-color: #003366; color: white; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 40px; }
-        .cell-name { font-weight: bold; display: block; margin-bottom: 2px; }
-        .cell-wins { font-size: 0.65rem; opacity: 0.8; }
+        .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.75rem; color: inherit; }
+        .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
+        .header-main { background-color: #003366; color: white; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
+        .header-digit { font-weight: bold; font-size: 0.8rem; background-color: rgba(128,128,128,0.1); }
+        .side-label { background-color: #003366 !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; font-size: 0.8rem; text-transform: uppercase; }
+        .cell-name { font-weight: bold; display: block; font-size: 0.75rem; }
+        .cell-wins { font-size: 0.65rem; opacity: 0.8; display: block; margin-top: 2px; }
     </style>
     <div class='grid-container'>
     <table class='mm-table'>
     """
 
     # ROW 1: GAME WINNER (Merged Header)
-    html += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER (Last Digit)</td></tr>"
+    html += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     
     # ROW 2: Winner Digits
     html += "<tr><td colspan='2' style='border:none;'></td>"
@@ -161,26 +160,22 @@ if final_data:
         html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {opacity});'>{i}</td>"
     html += "</tr>"
 
-    # ROWS 3-12: Loser Label + Digits + Cells
+    # ROWS: Side Label + Digits + Cells
     for r in range(10):
         html += "<tr>"
         if r == 0:
-            html += f"<td rowspan='10' class='side-label'>GAME LOSER (Last Digit)</td>"
+            html += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
         
-        # Loser Digit Header
         l_opacity = min(l_counts[r] / max_l, 1.0) if l_counts[r] > 0 else 0
         html += f"<td class='header-digit' style='background-color: rgba(255, 102, 0, {l_opacity});'>{r}</td>"
         
-        # Grid Cells
         for c in range(10):
             val = heatmap_wins.at[r, c]
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
             c_opacity = min(val / max_cell, 1.0) if val > 0 else 0
-            
-            # Determine text color based on cell intensity
             txt_color = "white" if c_opacity > 0.5 else "inherit"
             
-            html += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 80px; height: 55px;'>"
+            html += f"<td style='background-color: rgba(255, 102, 0, {c_opacity}); color: {txt_color}; min-width: 85px; height: 60px;'>"
             html += f"<span class='cell-name'>{owner}</span>"
             if val > 0: html += f"<span class='cell-wins'>({val} wins)</span>"
             html += "</td>"
