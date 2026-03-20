@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 
 # --- 1. CONFIG & GRID DATA ---
-st.set_page_config(page_title="2026 Box Pool - DEV", page_icon="🏀", layout="centered")
+st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
 
 # Grid data from your spreadsheet
 GRID_DATA = {
@@ -21,7 +21,7 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
-# Payout tiers
+# Payout tiers from your provided table
 PAYOUT_MAP = {
     "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
     "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
@@ -59,6 +59,7 @@ def fetch_tournament_data():
                 h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
                 
+                # Extract Seeds
                 h_seed = h.get('curatedRank', {}).get('current', '')
                 a_seed = a.get('curatedRank', {}).get('current', '')
                 h_disp = f"({h_seed}) {h['team']['shortDisplayName']}" if h_seed and h_seed <= 16 else h['team']['shortDisplayName']
@@ -66,21 +67,30 @@ def fetch_tournament_data():
                 
                 h_s, a_s = int(h['score']), int(a['score'])
                 
+                # Determine Winner Digit and Loser Digit
+                if h_s > a_s:
+                    w_digit, l_digit = h_s % 10, a_s % 10
+                    winner_team, loser_team = h_disp, a_disp
+                else:
+                    w_digit, l_digit = a_s % 10, h_s % 10
+                    winner_team, loser_team = a_disp, h_disp
+
                 if "STATUS_FINAL" in status:
                     final_games.append({
-                        "Winner": GRID_DATA.get(str(a_s%10), {}).get(str(h_s%10), "??"),
+                        "Winner": GRID_DATA.get(str(l_digit), {}).get(str(w_digit), "??"),
                         "Payout": pay,
-                        "H": h_s % 10, "A": a_s % 10,
+                        "W_Digit": w_digit, "L_Digit": l_digit,
                         "Matchup": f"{a_disp} @ {h_disp}",
                         "Result": f"{a_s}-{h_s}",
-                        "Date": current.strftime("%m/%d")
+                        "Date": current.strftime("%m/%d"),
+                        "Round": rnd
                     })
                 elif "STATUS_IN_PROGRESS" in status or "STATUS_HALFTIME" in status:
                     live_games.append({
                         "Matchup": f"{a_disp} @ {h_disp}",
                         "Score": f"{a_s}-{h_s}",
                         "Time": ev['status']['type']['shortDetail'],
-                        "Leader": GRID_DATA.get(str(a_s%10), {}).get(str(h_s%10), "??"),
+                        "Leader": GRID_DATA.get(str(l_digit), {}).get(str(w_digit), "??"),
                         "Potential": pay
                     })
         except: pass
@@ -88,10 +98,10 @@ def fetch_tournament_data():
     return final_games, live_games
 
 # --- 3. UI DISPLAY ---
-st.title("🏀 2026 Box Pool Tracker")
+st.title("🏀 Shelly's 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# LEADERBOARD (Pinned to Top)
+# 1. LEADERBOARD
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -99,7 +109,7 @@ if final_data:
     lead['Total'] = lead['Total'].map('${:,.0f}'.format)
     st.dataframe(lead, use_container_width=True, hide_index=True)
 
-# LIVE TRACKER
+# 2. LIVE TRACKER
 if live_data:
     st.header("⏳ Live Games")
     for g in live_data:
@@ -109,72 +119,74 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# GAME HISTORY (Now ABOVE Statistics)
+# 3. GAME HISTORY (Expander style)
 if final_data:
     st.divider()
     st.header("📜 Game History")
     for g in reversed(final_data):
-        st.write(f"**{g['Date']}**: {g['Matchup']} ({g['Result']}) → **{g['Winner']}** :green[(${g['Payout']})]")
+        with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} ({g['Result']})", expanded=False):
+            st.write(f"**Date:** {g['Date']} ({g['Round']})")
+            st.write(f"**Final Score:** {g['Result']} (Winner:{g['W_Digit']} Loser:{g['L_Digit']})")
+            st.write(f"**Square Owner:** {g['Winner']}")
 
-# STATISTICS SECTION (Hot/Cold first, then Heatmapped Grid)
+# 4. STATISTICS SECTION
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
     
-    # 1. Hot and Cold Numbers (Frequency Tally)
-    h_digits = [g['H'] for g in final_data]
-    a_digits = [g['A'] for g in final_data]
+    # Frequency Tally for Hot/Cold (Winner vs Loser)
+    w_digits = [g['W_Digit'] for g in final_data]
+    l_digits = [g['L_Digit'] for g in final_data]
+    w_counts = pd.Series(w_digits).value_counts().reindex(range(10), fill_value=0)
+    l_counts = pd.Series(l_digits).value_counts().reindex(range(10), fill_value=0)
     
-    h_counts = pd.Series(h_digits).value_counts().reindex(range(10), fill_value=0)
-    a_counts = pd.Series(a_digits).value_counts().reindex(range(10), fill_value=0)
-    
-    col_h, col_a = st.columns(2)
-    with col_h:
-        st.subheader("🔥 Home Digits")
-        st.write(f"Hottest: **{h_counts.idxmax()}** | Coldest: **{h_counts.idxmin()}**")
-    with col_a:
-        st.subheader("❄️ Away Digits")
-        st.write(f"Hottest: **{a_counts.idxmax()}** | Coldest: **{a_counts.idxmin()}**")
+    col_w, col_l = st.columns(2)
+    with col_w:
+        st.subheader("🔥 Winning Digits")
+        st.write(f"Hottest: **{w_counts.idxmax()}** | Coldest: **{w_counts.idxmin()}**")
+    with col_l:
+        st.subheader("❄️ Losing Digits")
+        st.write(f"Hottest: **{l_counts.idxmax()}** | Coldest: **{l_counts.idxmin()}**")
 
-    # 2. Fully Heatmapped Grid (Custom CSS)
+    # Full Heatmap with Axis Mapping
     st.subheader("🔥 Grid Heatmap")
-    
-    heatmap = pd.DataFrame(0, index=range(10), columns=range(10))
+    heatmap_wins = pd.DataFrame(0, index=range(10), columns=range(10))
     for g in final_data:
-        heatmap.at[g['A'], g['H']] += 1
+        heatmap_wins.at[g['L_Digit'], g['W_Digit']] += 1
         
     def get_color(val, max_val):
         if val == 0: return "#ffffff"
         opacity = min(val / max_val, 1.0)
         return f"rgba(255, 102, 0, {opacity})"
 
-    max_val = heatmap.max().max() if heatmap.max().max() > 0 else 1
+    max_win = heatmap_wins.max().max() if heatmap_wins.max().max() > 0 else 1
     
-    # Building HTML Table for Heatmap
-    html = "<table style='width:100%; border-collapse: collapse; text-align:center; font-family:sans-serif;'>"
-    # Header Row
-    html += "<tr><td style='border:none;'></td><td colspan='10' style='font-weight:bold; background:#003366; color:white;'>HOME DIGIT</td></tr><tr><td style='border:none;'></td>"
+    # Building HTML Table for true X/Y Heatmap with Names (Game Winners across top, Losers down side)
+    html = "<div style='overflow-x:auto;'><table style='width:100%; border-collapse: collapse; text-align:center; font-family:sans-serif; font-size: 0.8rem;'>"
+    html += "<tr><td style='border:none;'></td><td colspan='10' style='font-weight:bold; background:#003366; color:white; padding:10px;'>GAME WINNERS (Across Top)</td></tr><tr><td style='border:none;'></td>"
     for i in range(10):
-        # Header Heatmap (X-Axis)
-        bg = get_color(h_counts[i], h_counts.max())
+        bg = get_color(w_counts[i], w_counts.max() if w_counts.max() > 0 else 1)
         html += f"<td style='background:{bg}; font-weight:bold; border:1px solid #ddd; padding:5px;'>{i}</td>"
     html += "</tr>"
     
-    # Rows
     for r in range(10):
-        # Y-Axis Header Heatmap
-        bg_y = get_color(a_counts[r], a_counts.max())
-        html += f"<tr><td style='background:{bg_y}; font-weight:bold; border:1px solid #ddd; width:30px;'>{r}</td>"
+        bg_y = get_color(l_counts[r], l_counts.max() if l_counts.max() > 0 else 1)
+        html += f"<tr><td style='background:{bg_y}; font-weight:bold; border:1px solid #ddd; width:30px; writing-mode: vertical-rl; text-orientation: mixed;'>LOSER {r}</td>"
         for c in range(10):
-            val = heatmap.at[r, c]
-            bg_cell = get_color(val, max_val)
-            text_color = "white" if val > (max_val/2) else "black"
-            html += f"<td style='background:{bg_cell}; color:{text_color}; border:1px solid #ddd; padding:8px;'>{val if val > 0 else ''}</td>"
+            val = heatmap_wins.at[r, c]
+            owner = GRID_DATA.get(str(r), {}).get(str(c), "")
+            bg_cell = get_color(val, max_win)
+            text_color = "white" if val > (max_win/2) else "black"
+            
+            cell_content = f"<b>{owner}</b>"
+            if val > 0:
+                cell_content += f"<br><span style='font-size:0.7rem;'>({val} wins)</span>"
+            
+            html += f"<td style='background:{bg_cell}; color:{text_color}; border:1px solid #ddd; padding:8px; min-width:90px;'>{cell_content}</td>"
         html += "</tr>"
-    html += "</table>"
+    html += "</table></div>"
     
     st.markdown(html, unsafe_allow_html=True)
-    st.caption("Heatmap intensity based on number of final score occurrences. Darker = Hotter.")
 
 if st.button('Update Scores'):
     st.cache_data.clear()
