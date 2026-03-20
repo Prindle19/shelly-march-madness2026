@@ -7,7 +7,7 @@ import pytz
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
 
-# Your specific, randomly drawn sequence for the grid axes [cite: 1]
+# Randomized sequence for the grid axes
 WINNER_AXIS = ['3', '2', '1', '6', '8', '9', '5', '0', '7', '4']
 LOSER_AXIS = ['8', '7', '3', '0', '4', '2', '9', '5', '1', '6']
 
@@ -40,7 +40,18 @@ def get_payout_info(date_str):
     rnd = schedule.get(date_str, "1st Round")
     return PAYOUT_MAP.get(rnd, 50), rnd
 
-# --- 2. DATA ENGINE ---
+# --- 2. COLOR ENGINE ---
+def get_fire_ice_color(val, mx):
+    """Interpolates between #05FFFF (Ice) and #FF0505 (Fire)"""
+    ratio = val / mx if mx > 0 else 0
+    # Ice: R:5, G:255, B:255
+    # Fire: R:255, G:5, B:5
+    r = int(5 + (250 * ratio))
+    g = int(255 - (250 * ratio))
+    b = int(255 - (250 * ratio))
+    return f"rgb({r}, {g}, {b})"
+
+# --- 3. DATA ENGINE ---
 @st.cache_data(ttl=60)
 def fetch_tournament_data():
     tz = pytz.timezone('US/Eastern')
@@ -85,11 +96,11 @@ def fetch_tournament_data():
         current += timedelta(days=1)
     return final_games, live_games
 
-# --- 3. UI DISPLAY ---
+# --- 4. UI DISPLAY ---
 st.title("🏀 Shelly's 2026 Box Pool Tracker")
 final_data, live_data = fetch_tournament_data()
 
-# 1. LEADERBOARD
+# STANDINGS
 if final_data:
     st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
@@ -97,7 +108,7 @@ if final_data:
     lead['Total'] = lead['Total'].map('${:,.0f}'.format)
     st.dataframe(lead, use_container_width=True, hide_index=True)
 
-# 2. LIVE TRACKER
+# LIVE TRACKER
 if live_data:
     st.header("⏳ Live Games")
     for g in live_data:
@@ -107,7 +118,7 @@ if live_data:
             c1.write(f"{g['Score']} | {g['Time']}")
             c2.metric("Leader", g['Leader'], f"${g['Potential']}")
 
-# 3. GAME HISTORY (Chronological: Oldest to Newest)
+# HISTORY (Chronological)
 if final_data:
     st.divider()
     st.header("📜 Game History")
@@ -116,103 +127,78 @@ if final_data:
             st.write(f"**Date:** {g['Date']} ({g['Round']})")
             st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
 
-# 4. STATISTICS & GRID
+# STATS & GRID
 if final_data:
     st.divider()
     st.header("📈 Tournament Statistics")
     
-    # Combined Frequency Tally
-    all_digits = [g['W'] for g in final_data] + [g['L'] for g in final_data]
-    digit_counts = pd.Series(all_digits).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
-    max_count = digit_counts.max() or 1
+    w_digits = [g['W'] for g in final_data]
+    l_digits = [g['L'] for g in final_data]
+    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
+    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
     
-    # Fire and Ice Gradient Engine
-    def get_super_gradient(val, mx):
-        # 0 = Pure Blue, mx = Pure Red
-        factor = val / mx
-        red = int(255 * factor)
-        blue = int(255 * (1 - factor))
-        # Use high opacity for "Super" colors
-        return f"rgba({red}, 0, {blue}, 0.8)"
+    max_w, max_l = w_counts.max() or 1, l_counts.max() or 1
 
-    # Hot and Cold Digit Breakdown
-    st.subheader("🔥 Hot Digits / ❄️ Cold Digits")
-    d_sorted = digit_counts.sort_values(ascending=False)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**TOP 5 HOT**")
-        html_h = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.head(5).items():
-            color = get_super_gradient(count, max_count)
-            html_h += f"<div style='background:{color}; color:white; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_h += "</div>"
-        st.markdown(html_h, unsafe_allow_html=True)
-    
-    with col2:
-        st.write("**BOTTOM 5 COLD**")
-        html_c = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in d_sorted.tail(5).items():
-            color = get_super_gradient(count, max_count)
-            html_c += f"<div style='background:{color}; color:white; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_c += "</div>"
-        st.markdown(html_c, unsafe_allow_html=True)
+    # Frequency Breakdowns
+    st.subheader("🔥 Fire & ❄️ Ice Digits")
+    w_sorted = w_counts.sort_values(ascending=False)
+    l_sorted = l_counts.sort_values(ascending=False)
 
-    # --- THE SUPER GRADIENT HEATMAP GRID ---
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write("**WINNER FREQUENCY**")
+        html_w = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in w_sorted.head(5).items(): html_w += f"<div style='background:{get_fire_ice_color(c, max_w)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
+        html_w += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in w_sorted.tail(5).items(): html_w += f"<div style='background:{get_fire_ice_color(c, max_w)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
+        html_w += "</div>"
+        st.markdown(html_w, unsafe_allow_html=True)
+
+    with c2:
+        st.write("**LOSER FREQUENCY**")
+        html_l = "<div style='display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in l_sorted.head(5).items(): html_l += f"<div style='background:{get_fire_ice_color(c, max_l)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
+        html_l += "</div><div style='margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;'>"
+        for d, c in l_sorted.tail(5).items(): html_l += f"<div style='background:{get_fire_ice_color(c, max_l)}; color:black; padding:6px; border-radius:4px; border:1px solid #ddd;'><b>{d}</b> ({c})</div>"
+        html_l += "</div>"
+        st.markdown(html_l, unsafe_allow_html=True)
+
+    # GRID
     st.subheader("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
-    for g in final_data:
-        heatmap_wins.at[g['L'], g['W']] += 1
-    
+    for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
     max_cell = heatmap_wins.max().max() or 1
-    w_freq = digit_counts.reindex(WINNER_AXIS, fill_value=0)
-    l_freq = digit_counts.reindex(LOSER_AXIS, fill_value=0)
 
     html_grid = """
     <style>
         .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; }
-        .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; color: inherit; }
-        .mm-table td, .mm-table th { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
+        .mm-table { width: 100%; min-width: 900px; border-collapse: collapse; font-family: sans-serif; font-size: 0.8rem; color: black; }
+        .mm-table td, .mm-table th { border: 1px solid rgba(0,0,0,0.1); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
-        .header-digit { font-weight: bold; font-size: 0.8rem; color: white; }
         .side-label { background-color: #31333F !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; text-transform: uppercase; border: none !important; }
-        .cell-name { font-weight: bold; display: block; }
-        .cell-wins { font-size: 0.65rem; opacity: 0.9; display: block; margin-top: 2px; }
     </style>
-    <div class='grid-container'>
-    <table class='mm-table'>
+    <div class='grid-container'><table class='mm-table'>
     """
 
-    # ROW 1: GAME WINNER (Merged Header)
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
-    
-    # ROW 2: Winner Digits (Random Order with Axis Gradient)
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        bg = get_super_gradient(w_freq[i], max_count)
-        html_grid += f"<td class='header-digit' style='background-color: {bg};'>{i}</td>"
+        bg = get_fire_ice_color(w_counts[i], max_w)
+        html_grid += f"<td style='background:{bg}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
 
-    # ROWS: Side Label + Digits + Randomized Cells
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
-        if idx == 0:
-            html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
-        
-        bg_l = get_super_gradient(l_freq[r], max_count)
-        html_grid += f"<td class='header-digit' style='background-color: {bg_l};'>{r}</td>"
-        
+        if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
+        bg_l = get_fire_ice_color(l_counts[r], max_l)
+        html_grid += f"<td style='background:{bg_l}; font-weight:bold;'>{r}</td>"
         for c in WINNER_AXIS:
             val = heatmap_wins.at[r, c]
             owner = GRID_DATA.get(str(r), {}).get(str(c), "??")
-            
-            # Map specific square win counts to the Super Gradient
-            bg_cell = get_super_gradient(val, max_cell) if val > 0 else "rgba(0, 0, 255, 0.15)"
-            txt_color = "white" if val > 0 else "inherit"
-            
-            html_grid += f"<td style='background-color: {bg_cell}; color: {txt_color}; min-width: 85px; height: 60px;'>"
-            html_grid += f"<span class='cell-name'>{owner}</span>"
-            if val > 0: html_grid += f"<span class='cell-wins'>({val} wins)</span>"
+            bg_cell = get_fire_ice_color(val, max_cell)
+            html_grid += f"<td style='background:{bg_cell}; min-width:85px; height:60px;'>"
+            html_grid += f"<b>{owner}</b>"
+            if val > 0: html_grid += f"<br>({val} wins)"
             html_grid += "</td>"
         html_grid += "</tr>"
 
