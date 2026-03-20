@@ -24,158 +24,101 @@ GRID_DATA = {
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
-# Payout Tiers
-PAYOUT_MAP = {
-    "1st Round": 50, "2nd Round": 100, "Sweet 16": 200, 
-    "Elite 8": 400, "Final 4": 800, "Championship Final": 1500
-}
+# Tournament Structure
+TOTAL_GAMES = 63
+PAYOUT_MAP = {"1st Round": 50, "2nd Round": 100, "Sweet 16": 200, "Elite 8": 400, "Final 4": 800, "Championship Final": 1500}
 
 def get_payout_info(date_str):
-    schedule = {
-        "20260319": "1st Round", "20260320": "1st Round",
-        "20260321": "2nd Round", "20260322": "2nd Round",
-        "20260326": "Sweet 16",  "20260327": "Sweet 16",
-        "20260328": "Elite 8",   "20260329": "Elite 8",
-        "20260404": "Final 4",   "20260406": "Championship Final"
-    }
+    schedule = {"20260319": "1st Round", "20260320": "1st Round", "20260321": "2nd Round", "20260322": "2nd Round", "20260326": "Sweet 16", "20260327": "Sweet 16", "20260328": "Elite 8", "20260329": "Elite 8", "20260404": "Final 4", "20260406": "Championship Final"}
     rnd = schedule.get(date_str, "1st Round")
-    return PAYOUT_MAP.get(rnd, 50), rnd
+    return PAYOUT_MAP.get(rnd, 50)
 
-# --- 2. ADVANCED COLOR ENGINE (FIRE & ICE STRETCH) ---
+# --- 2. COLOR ENGINE ---
 def get_stretched_gradient(val, mx, mid):
-    """
-    3-Point Gradient: Ice (#05FFFF) -> Neutral -> Fire (#FF0505).
-    Returns (Background Color, Text Color).
-    """
-    if val == mid:
-        return "rgba(128, 128, 128, 0.2)", "inherit"
-    
+    if val == mid: return "rgba(128, 128, 128, 0.2)", "inherit"
     if val > mid:
         ratio = (val - mid) / (mx - mid) if (mx - mid) > 0 else 0
-        r = int(128 + (127 * ratio))
-        g = int(128 - (123 * ratio))
-        b = int(128 - (123 * ratio))
-        txt = "white" if ratio > 0.4 else "black"
-        return f"rgb({r}, {g}, {b})", txt
+        r, g, b = int(128 + (127 * ratio)), int(128 - (123 * ratio)), int(128 - (123 * ratio))
+        return f"rgb({r}, {g}, {b})", ("white" if ratio > 0.4 else "black")
     else:
         ratio = val / mid if mid > 0 else 0
-        r = int(5 + (123 * ratio))
-        g = int(255 - (127 * ratio))
-        b = int(255 - (127 * ratio))
-        txt = "white" if ratio < 0.6 else "black"
-        return f"rgb({r}, {g}, {b})", txt
+        r, g, b = int(5 + (123 * ratio)), int(255 - (127 * ratio)), int(255 - (127 * ratio))
+        return f"rgb({r}, {g}, {b})", ("white" if ratio < 0.6 else "black")
 
 # --- 3. DATA ENGINE ---
 @st.cache_data(ttl=60)
 def fetch_tournament_data():
     tz = pytz.timezone('US/Eastern')
-    start_date = tz.localize(datetime(2026, 3, 19))
-    end_date = datetime.now(tz)
-    final_games, live_games = [], []
+    start_date, end_date = tz.localize(datetime(2026, 3, 19)), datetime.now(tz)
+    final_games = []
     current = start_date
     while current <= end_date:
         d_str = current.strftime("%Y%m%d")
-        pay, rnd = get_payout_info(d_str)
+        pay = get_payout_info(d_str)
         url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={d_str}"
         try:
             data = requests.get(url).json()
             for ev in data.get('events', []):
-                status = ev['status']['type']['name']
-                comp = ev['competitions'][0]
-                h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
-                a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
-                h_s, a_s = int(h['score']), int(a['score'])
-                
-                if h_s > a_s: w_d, l_d = h_s % 10, a_s % 10
-                else: w_d, l_d = a_s % 10, h_s % 10
-
-                if "STATUS_FINAL" in status:
-                    final_games.append({
-                        "Winner": GRID_DATA.get(str(l_d), {}).get(str(w_d), "??"),
-                        "Payout": pay, "W": str(w_d), "L": str(l_d), "Date": current.strftime("%m/%d"),
-                        "Matchup": f"{a['team']['shortDisplayName']} @ {h['team']['shortDisplayName']}", 
-                        "Result": f"{a_s}-{h_s}", "Round": rnd
-                    })
+                if ev['status']['type']['name'] == "STATUS_FINAL":
+                    comp = ev['competitions'][0]
+                    h, a = next(t for t in comp['competitors'] if t['homeAway'] == 'home'), next(t for t in comp['competitors'] if t['homeAway'] == 'away')
+                    h_s, a_s = int(h['score']), int(a['score'])
+                    w_d, l_d = (h_s % 10, a_s % 10) if h_s > a_s else (a_s % 10, h_s % 10)
+                    final_games.append({"Winner": GRID_DATA.get(str(l_d), {}).get(str(w_d), "??"), "Payout": pay, "W": str(w_d), "L": str(l_d), "Matchup": f"{a['team']['shortDisplayName']} @ {h['team']['shortDisplayName']}", "Result": f"{a_s}-{h_s}"})
         except: pass
         current += timedelta(days=1)
-    return final_games, []
+    return final_games
 
 # --- 4. UI DISPLAY ---
 st.title("🏀 Shelly's 2026 Box Pool Tracker")
-final_data, _ = fetch_tournament_data()
+final_data = fetch_tournament_data()
 
-# LEADERBOARD
 if final_data:
-    st.header("🏆 Cumulative Standings")
     df_f = pd.DataFrame(final_data)
-    lead = df_f.groupby("Winner").agg(Wins=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
-    lead['Total'] = lead['Total'].map('${:,.0f}'.format)
-    st.dataframe(lead, use_container_width=True, hide_index=True)
+    w_counts = df_f['W'].value_counts().reindex(WINNER_AXIS, fill_value=0)
+    l_counts = df_f['L'].value_counts().reindex(LOSER_AXIS, fill_value=0)
+    all_counts = pd.Series(df_f['W'].tolist() + df_f['L'].tolist()).value_counts().reindex([str(i) for i in range(10)], fill_value=0)
+    max_c, mid_c = all_counts.max() or 1, all_counts.median() or 0.5
 
-# STATISTICS
-if final_data:
-    st.divider()
-    st.header("📈 Tournament Statistics")
-    
-    w_digits = [g['W'] for g in final_data]
-    l_digits = [g['L'] for g in final_data]
-    w_counts = pd.Series(w_digits).value_counts().reindex(WINNER_AXIS, fill_value=0)
-    l_counts = pd.Series(l_digits).value_counts().reindex(LOSER_AXIS, fill_value=0)
-    
-    # Calculate Individual Axis Median Breaks
-    max_w, mid_w = w_counts.max() or 1, w_counts.median() or 0.5
-    max_l, mid_l = l_counts.max() or 1, l_counts.median() or 0.5
-
-    # WINNER STATS
-    st.subheader("🏁 Game Winners: Top 5 Hot / Bottom 5 Cold")
-    w_sorted = w_counts.sort_values(ascending=False)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**🔥 TOP 5 HOT**")
-        html_wh = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in w_sorted.head(5).items():
-            bg, tx = get_stretched_gradient(count, max_w, mid_w)
-            html_wh += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_wh += "</div>"
-        st.markdown(html_wh, unsafe_allow_html=True)
-    with col2:
-        st.write("**❄️ BOTTOM 5 COLD**")
-        html_wc = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in w_sorted.tail(5).items():
-            bg, tx = get_stretched_gradient(count, max_w, mid_w)
-            html_wc += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_wc += "</div>"
-        st.markdown(html_wc, unsafe_allow_html=True)
-
-    # LOSER STATS
-    st.subheader("❌ Game Losers: Top 5 Hot / Bottom 5 Cold")
-    l_sorted = l_counts.sort_values(ascending=False)
-    col3, col4 = st.columns(2)
-    with col3:
-        st.write("**🔥 TOP 5 HOT**")
-        html_lh = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in l_sorted.head(5).items():
-            bg, tx = get_stretched_gradient(count, max_l, mid_l)
-            html_lh += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_lh += "</div>"
-        st.markdown(html_lh, unsafe_allow_html=True)
-    with col4:
-        st.write("**❄️ BOTTOM 5 COLD**")
-        html_lc = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-        for digit, count in l_sorted.tail(5).items():
-            bg, tx = get_stretched_gradient(count, max_l, mid_l)
-            html_lc += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{digit}</b> ({count})</div>"
-        html_lc += "</div>"
-        st.markdown(html_lc, unsafe_allow_html=True)
-
-    # GRID
-    st.divider()
-    st.header("🔥 Grid Heatmap")
     heatmap_wins = pd.DataFrame(0, index=LOSER_AXIS, columns=WINNER_AXIS)
     for g in final_data: heatmap_wins.at[g['L'], g['W']] += 1
     max_win = heatmap_wins.max().max() or 1
     mid_win = heatmap_wins[heatmap_wins > 0].median().median() if not heatmap_wins[heatmap_wins > 0].empty else 0.5
 
+    # 1. LEADERBOARD
+    st.header("🏆 Cumulative Standings")
+    lead = df_f.groupby("Winner").agg(Wins=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
+    lead['Total'] = lead['Total'].map('${:,.0f}'.format)
+    st.dataframe(lead, use_container_width=True, hide_index=True)
+
+    # 2. STATISTICS
+    st.divider()
+    st.header("📈 Tournament Statistics")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔥 Top 5 Hot Digits")
+        h_sorted = all_counts.sort_values(ascending=False).head(5)
+        html = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for d, c in h_sorted.items():
+            bg, tx = get_stretched_gradient(c, max_c, mid_c)
+            html += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{d}</b> ({c})</div>"
+        st.markdown(html + "</div>", unsafe_allow_html=True)
+    with col2:
+        st.subheader("❄️ Bottom 5 Cold Digits")
+        c_sorted = all_counts.sort_values(ascending=False).tail(5)
+        html = "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        for d, c in c_sorted.items():
+            bg, tx = get_stretched_gradient(c, max_c, mid_c)
+            html += f"<div style='background:{bg}; color:{tx}; padding:8px 12px; border-radius:6px; border:1px solid #444;'><b>{d}</b> ({c})</div>"
+        st.markdown(html + "</div>", unsafe_allow_html=True)
+
+    # 3. PROJECTION LOGIC
+    games_played = len(final_data)
+    games_left = TOTAL_GAMES - games_played
+    
+    # 4. GRID HEATMAP
+    st.divider()
+    st.header("🔥 Grid Heatmap & Projected Totals")
     html_grid = """
     <style>
         .grid-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; }
@@ -183,38 +126,45 @@ if final_data:
         .mm-table td { border: 1px solid rgba(128,128,128,0.3); padding: 10px; text-align: center; vertical-align: middle; }
         .header-main { background-color: #31333F; color: white; font-weight: bold; text-transform: uppercase; border: none !important; }
         .side-label { background-color: #31333F !important; color: white !important; font-weight: bold; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); width: 45px; text-transform: uppercase; border: none !important; }
+        .proj-text { font-size: 0.6rem; opacity: 0.7; font-style: italic; }
     </style>
     <div class='grid-container'><table class='mm-table'>
     """
     html_grid += "<tr><td colspan='2' style='border:none;'></td><td colspan='10' class='header-main'>GAME WINNER</td></tr>"
     html_grid += "<tr><td colspan='2' style='border:none;'></td>"
     for i in WINNER_AXIS:
-        bg, tx = get_stretched_gradient(w_counts[i], max_w, mid_w)
+        bg, tx = get_stretched_gradient(all_counts[i], max_c, mid_c)
         html_grid += f"<td style='background:{bg}; color:{tx}; font-weight:bold;'>{i}</td>"
     html_grid += "</tr>"
 
     for idx, r in enumerate(LOSER_AXIS):
         html_grid += "<tr>"
         if idx == 0: html_grid += f"<td rowspan='10' class='side-label'>GAME LOSER</td>"
-        bg_l, tx_l = get_stretched_gradient(l_counts[r], max_l, mid_l)
+        bg_l, tx_l = get_stretched_gradient(all_counts[r], max_c, mid_c)
         html_grid += f"<td style='background:{bg_l}; color:{tx_l}; font-weight:bold;'>{r}</td>"
         for c in WINNER_AXIS:
             wins = heatmap_wins.at[r, c]
-            bg_cell, tx_cell = get_stretched_gradient(wins, max_win, mid_win) if wins > 0 else ("rgba(128,128,128,0.05)", "inherit")
-            html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:60px;'>"
-            html_grid += f"<b>{GRID_DATA.get(r, {}).get(c, '??')}</b>"
-            if wins > 0: html_grid += f"<br><span style='font-size: 0.65rem;'>({wins} {'Win' if wins == 1 else 'Wins'})</span>"
+            owner_total = df_f[df_f['Winner'] == GRID_DATA[r][c]]['Payout'].sum()
+            # Projection: (Current Win Rate) * Games Remaining * Avg Future Payout (weighted)
+            win_rate = wins / games_played if games_played > 0 else 0
+            proj_future = win_rate * games_left * 150 # Est avg future payout
+            proj_total = owner_total + proj_future
+            
+            bg_cell, tx_cell = get_stretched_gradient(wins, max_win, mid_win) if wins > 0 else ("rgba(5, 255, 255, 0.1)", "inherit")
+            html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:70px;'><b>{GRID_DATA[r][c]}</b>"
+            if wins > 0:
+                html_grid += f"<br>({wins} {'Win' if wins == 1 else 'Wins'})"
+                html_grid += f"<br><span class='proj-text'>Proj: ${int(proj_total)}</span>"
             html_grid += "</td>"
         html_grid += "</tr>"
     st.markdown(html_grid + "</table></div>", unsafe_allow_html=True)
 
-# HISTORY (Chronological)
-if final_data:
+    # 5. GAME HISTORY
     st.divider()
     st.header("📜 Game History")
     for g in final_data:
         with st.expander(f"**{g['Winner']}** won ${g['Payout']} — {g['Matchup']} ({g['Result']})", expanded=False):
-            st.write(f"**Final Score:** {g['Result']} (Winner:{g['W']} Loser:{g['L']})")
+            st.write(f"Winner Digit: {g['W']} | Loser Digit: {g['L']}")
 
 if st.button('Update Scores'):
     st.cache_data.clear()
