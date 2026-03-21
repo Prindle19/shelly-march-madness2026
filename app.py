@@ -3,9 +3,13 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import pytz
+from streamlit_autorefresh import st_autorefresh
 
 # --- 1. CONFIG & GRID DATA ---
 st.set_page_config(page_title="Shelly's 2026 Box Pool Tracker", page_icon="🏀", layout="centered")
+
+# Auto-refresh the app every 60 seconds (60000 milliseconds)
+st_autorefresh(interval=60000, limit=None, key="hoops_refresh")
 
 # Randomized sequence for the grid axes
 WINNER_AXIS = ['3', '2', '1', '6', '8', '9', '5', '0', '7', '4']
@@ -20,7 +24,7 @@ GRID_DATA = {
     '2': {'3': 'Amanda Fahey', '2': 'Shelly', '1': 'PD', '6': 'Tim Callahan', '8': 'Terzis', '9': 'Fuck Fatboy', '5': 'Keith McTarsney', '0': 'Rob Farr', '7': 'Marty / Tommy', '4': 'Kelly Bradley'},
     '9': {'3': 'Lou T', '2': 'CKel', '1': 'Frank D', '6': 'Meg', '8': 'Tommy Scanlon', '9': 'Pat Repoli', '5': 'Al', '0': 'Sean Lynch', '7': 'Fuck Fatboy', '4': 'Alan Lapa'},
     '5': {'3': 'Maureen McTarnsey', '2': 'Gus', '1': 'Billy Sullivan', '6': 'Mike C', '8': 'Dan West', '9': 'Ashling', '5': 'Chris Murray', '0': 'Irv', '7': 'Amanda Fahey', '4': 'Justin Yuka'},
-    '1': {'3': 'Lloyd', '2': 'Ferro', '1': 'Tommy B', '6': 'Tim McNelis', '8': 'CKel', '9': 'Greg Doc', '5': 'Jardonne', '0': 'Sean Wohltman', '7': 'Banky/Doc', '4': 'Chris Murray'},
+    '1': {'3': 'Lloyd', '2': 'Ferro', '1': 'Tommy B', '6': 'Tim McNelis', '8': 'CKel', '9': 'Greg Doc', '5': 'Jardonne', '0': 'Sean Wohltman', '7': 'Mike/Eric/Matt', '4': 'Chris Murray'},
     '6': {'3': 'Derek Wanner', '2': 'Eugene', '1': 'Alan Lapa', '6': 'Fuck Fatboy', '8': 'GKel', '9': 'Vitolo', '5': 'Amanda Fahey', '0': 'Rose & Ben', '7': 'Rob Bodnar', '4': 'Fatboy'}
 }
 
@@ -283,14 +287,12 @@ if final_data:
             current_earned = sum(g['Payout'] for g in final_data if g['W'] == c and g['L'] == r)
             total_ev = current_earned + projected_future_value
             
-            # Use tx_cell directly for entire cell text including EV, preventing hard-to-read overrides.
             html_grid += f"<td style='background:{bg_cell}; color:{tx_cell}; min-width:85px; height:60px;'>"
             html_grid += f"<b>{owner}</b>"
             if wins > 0:
                 win_label = "Win" if wins == 1 else "Wins"
                 html_grid += f"<br><span style='font-size: 0.65rem; opacity: 0.8;'>({wins} {win_label})</span>"
             
-            # Remove the fixed green color override to respect parent tx_cell color.
             html_grid += f"<br><span style='font-size: 0.85rem; font-weight: 800;'>Est: ${total_ev:.2f}</span>"
             
             html_grid += "</td>"
@@ -298,6 +300,7 @@ if final_data:
     html_grid += "</table></div>"
     st.markdown(html_grid, unsafe_allow_html=True)
 
-if st.button('Update Scores'):
+# Kept the manual button just in case someone wants to force a refresh between the 60-second intervals
+if st.button('Update Scores Manually'):
     st.cache_data.clear()
     st.rerun()
