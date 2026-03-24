@@ -6,7 +6,7 @@ import pytz
 from streamlit_autorefresh import st_autorefresh
 
 # --- 1. CONFIGURATION & POOL SETUP ---
-st.set_page_config(page_title="2026 Box Pool Tracker", page_icon="🏀", layout="centered")
+st.set_page_config(page_title="2026 Box Pool Tracker", page_icon="🏀", layout="wide") # Switched to wide layout for columns
 st_autorefresh(interval=60000, limit=None, key="hoops_refresh")
 
 HISTORICAL_PROBS = {
@@ -53,7 +53,7 @@ POOLS = {
     "MRYC": {
         "TITLE": "🏀 MRYC 2026 Box Pool Tracker",
         "TOTAL_POOL": 1000,
-        "EST_EVENTS": 17, # 8 + 4 + 2 + 3 payout events
+        "EST_EVENTS": 17, 
         "WINNER_AXIS": ['8', '7', '0', '1', '5', '2', '3', '6', '9', '4'], 
         "LOSER_AXIS": ['5', '9', '8', '3', '0', '2', '1', '4', '7', '6'],
         "GRID_DATA": {
@@ -110,7 +110,6 @@ def fetch_tournament_data(pool_config):
     
     final_payout_events, live_games, upcoming_games = [], [], []
     
-    # Iterate explicitly over the active pool's scheduled dates
     for d_str, rnd_name in pool_config["SCHEDULE"].items():
         payout_rules = pool_config["PAYOUTS"].get(rnd_name, [])
         url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={d_str}"
@@ -203,44 +202,62 @@ def fetch_tournament_data(pool_config):
 st.title(config["TITLE"])
 final_data, live_data, upcoming_data = fetch_tournament_data(config)
 
-if final_data:
-    st.header("🏆 Cumulative Standings")
-    df_f = pd.DataFrame(final_data)
-    lead = df_f.groupby("Winner").agg(Hits=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
-    lead['Total'] = lead['Total'].map('${:,.0f}'.format)
-    st.dataframe(lead, use_container_width=True, hide_index=True)
-
-if live_data:
-    st.header("⏳ Live Games")
-    for g in live_data:
-        with st.container(border=True):
-            c1, c2 = st.columns([2, 1])
-            c1.markdown(f"**{g['Matchup']}**")
-            c1.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
-            c2.metric("Current Leader", g['Leader'], f"${g['Potential']}")
-
-# --- NEW: UPCOMING GAMES SECTION ---
-if upcoming_data and not live_data: 
-    st.header("📅 Upcoming Games")
+# --- GAME ACTION: LIVE & UPCOMING (SIDE-BY-SIDE) ---
+if live_data or upcoming_data:
+    st.divider()
+    st.header("🏀 Game Action")
+    col_live, col_upcoming = st.columns(2)
     
-    # Display in a nice 2-column grid
-    cols = st.columns(2)
-    for i, g in enumerate(upcoming_data):
-        with cols[i % 2]:
-            with st.container(border=True):
-                st.markdown(f"**{g['Matchup']}**")
-                st.caption(f"{g['Date']} | {g['DisplayTime']} ET ({g['Round']})")
-                st.markdown(f"⏳ *{g['Countdown']}*")
+    with col_live:
+        st.subheader("⏳ Live Games")
+        if live_data:
+            for g in live_data:
+                with st.container(border=True):
+                    st.markdown(f"**{g['Matchup']}**")
+                    st.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
+                    st.metric("Current Leader", g['Leader'], f"${g['Potential']}")
+        else:
+            st.info("No live games at the moment.")
+            
+    with col_upcoming:
+        st.subheader("📅 Upcoming Games")
+        if upcoming_data:
+            # Dynamically filter out "TBD" matchups
+            valid_upcoming = [g for g in upcoming_data if "TBA" not in g["Matchup"] and "TBD" not in g["Matchup"]]
+            
+            # Show up to 4 known matchups, or just 2 generic ones if none are set yet
+            display_upcoming = valid_upcoming[:4] if valid_upcoming else upcoming_data[:2]
+            
+            for g in display_upcoming:
+                with st.container(border=True):
+                    st.markdown(f"**{g['Matchup']}**")
+                    st.caption(f"{g['Date']} | {g['DisplayTime']} ET ({g['Round']})")
+                    st.markdown(f"⏳ *{g['Countdown']}*")
+        else:
+            st.info("No upcoming games currently scheduled.")
 
+# --- RESULTS: STANDINGS & HISTORY (SIDE-BY-SIDE) ---
 if final_data:
     st.divider()
-    st.header("📜 Payout History")
-    for g in reversed(final_data):
-        type_badge = f"🔄 {g['Type']}" if g['Type'] in ['Reverse', 'Halftime'] else f"✅ {g['Type']}"
-        with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} | {type_badge}", expanded=False):
-            st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
-            st.write(f"**Score Context:** {g['Result']} (Win Digit: {g['W']} | Lose Digit: {g['L']})")
+    st.header("🏆 Results & History")
+    col_standings, col_history = st.columns(2)
+    
+    with col_standings:
+        st.subheader("🏅 Cumulative Standings")
+        df_f = pd.DataFrame(final_data)
+        lead = df_f.groupby("Winner").agg(Hits=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
+        lead['Total'] = lead['Total'].map('${:,.0f}'.format)
+        st.dataframe(lead, use_container_width=True, hide_index=True)
+        
+    with col_history:
+        st.subheader("📜 Payout History")
+        for g in reversed(final_data):
+            type_badge = f"🔄 {g['Type']}" if g['Type'] in ['Reverse', 'Halftime'] else f"✅ {g['Type']}"
+            with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} | {type_badge}", expanded=False):
+                st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
+                st.write(f"**Score Context:** {g['Result']} (Win Digit: {g['W']} | Lose Digit: {g['L']})")
 
+# --- GRID & EV DATA ---
 if True: 
     st.divider()
     st.header("📈 Heatmap & Expected Value")
