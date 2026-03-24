@@ -133,7 +133,6 @@ def fetch_tournament_data(pool_config):
                 comp = ev['competitions'][0]
                 h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
-                h_s, a_s = int(h['score']), int(a['score'])
                 
                 h_half = int(h['linescores'][0]['value']) if 'linescores' in h and len(h['linescores']) > 0 else 0
                 a_half = int(a['linescores'][0]['value']) if 'linescores' in a and len(a['linescores']) > 0 else 0
@@ -175,8 +174,31 @@ def fetch_tournament_data(pool_config):
                         "Leader": pool_config['GRID_DATA'].get(str(l_d), {}).get(str(w_d), "??"), 
                         "Potential": sum(r['amount'] for r in payout_rules if r['type'] == 'Final') 
                     })
+                    
+                elif "STATUS_SCHEDULED" in status and payout_rules:
+                    if dt_est:
+                        time_diff = dt_est - now
+                        if time_diff.total_seconds() > 0:
+                            days = time_diff.days
+                            hours, remainder = divmod(time_diff.seconds, 3600)
+                            mins, _ = divmod(remainder, 60)
+                            
+                            if days > 0:
+                                countdown_str = f"Starts in {days}d {hours}h"
+                            elif hours > 0:
+                                countdown_str = f"Starts in {hours}h {mins}m"
+                            else:
+                                countdown_str = f"Starts in {mins}m"
+                                
+                            upcoming_games.append({
+                                "Matchup": f"{a_disp} @ {h_disp}",
+                                "DisplayTime": display_time,
+                                "Date": display_date,
+                                "GameTime": sort_time,
+                                "Countdown": countdown_str,
+                                "Round": rnd_name
+                            })
         except: pass
-        current += timedelta(days=1)
         
     final_payout_events.sort(key=lambda x: x.get('GameTime', 0))
     live_games.sort(key=lambda x: x.get('GameTime', 0))
