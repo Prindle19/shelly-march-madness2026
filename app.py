@@ -6,7 +6,7 @@ import pytz
 from streamlit_autorefresh import st_autorefresh
 
 # --- 1. CONFIGURATION & POOL SETUP ---
-st.set_page_config(page_title="2026 Box Pool Tracker", page_icon="🏀", layout="centered")
+st.set_page_config(page_title="2026 Box Pool Tracker", page_icon="🏀", layout="wide") # Switched to wide layout for columns
 st_autorefresh(interval=60000, limit=None, key="hoops_refresh")
 
 HISTORICAL_PROBS = {
@@ -17,7 +17,6 @@ HISTORICAL_PROBS = {
 POOLS = {
     "Shelly": {
         "TITLE": "🏀 Shelly's 2026 Box Pool Tracker",
-        "START_DATE": datetime(2026, 3, 19),
         "TOTAL_POOL": 9500,
         "EST_EVENTS": 63,
         "WINNER_AXIS": ['3', '2', '1', '6', '8', '9', '5', '0', '7', '4'],
@@ -53,22 +52,21 @@ POOLS = {
     
     "MRYC": {
         "TITLE": "🏀 MRYC 2026 Box Pool Tracker",
-        "START_DATE": datetime(2026, 3, 26), # Starts directly at the Sweet 16
         "TOTAL_POOL": 1000,
-        "EST_EVENTS": 17, # 8 + 4 + 2 + 3 payout events
-        "WINNER_AXIS": ['8','7','0','1','5','2','3','6','9','4'],
-        "LOSER_AXIS": ['5','9','8','3','0','2','1','4','7','6'],
+        "EST_EVENTS": 17, 
+        "WINNER_AXIS": ['8', '7', '0', '1', '5', '2', '3', '6', '9', '4'], 
+        "LOSER_AXIS": ['5', '9', '8', '3', '0', '2', '1', '4', '7', '6'],
         "GRID_DATA": {
-            '0': {'8': 'Scott Kennedy', '7': 'Wohltman', '0': 'Dave Johnson', '1': 'Kelly Kenneally', '5': 'Maggy G', '2': 'Aaron Feldman', '3': 'Kathleen Trombly', '6': 'Bonavita', '9': 'Chris DeFuria', '4': 'Beth Baccaro'},
-            '1': {'8': 'McEneny', '7': 'Kim Boedart Barry', '0': 'Evertt Tatarski', '1': 'Trombly Family', '5': 'Huch', '2': 'Pat Dennin', '3': 'A&D Schuett', '6': 'Harry Tatarski', '9': 'Nick Mills', '4': 'Alex Sporviero'},
-            '2': {'8': 'K&C Laufer', '7': 'Wilder H', '0': 'Elisabth Finkenauer', '1': 'Huch', '5': 'Dawn Harriman', '2': 'Bob Fahey', '3': 'Logan Mills', '6': 'Isla Eastmond', '9': 'Fogarty', '4': 'Scala'},
-            '3': {'8': 'Bob Fahey', '7': 'Polesky G&K', '0': 'Sheila Gonzalez', '1': 'Gina Kennedy', '5': 'George Polesky', '2': 'Todd Eastmond', '3': 'Wohltman', '6': 'Dave Leone', '9': 'Maggy G', '4': 'McEneny'},
-            '4': {'8': 'Baglieri', '7': 'Fogarty', '0': 'Lexi Mills', '1': 'Baglieri', '5': 'Peter Gonzalez', '2': 'Bonavita', '3': 'Scott Kennedy', '6': 'Bob Crines', '9': 'Wohltman', '4': 'Baglieri'},
-            '5': {'8': 'Aaaron Feldman', '7': 'Nina Tatarski', '0': 'Shayned Eastmond', '1': 'Kelly Kenneally', '5': 'Bart Dennin', '2': 'Rob Zebrowski', '3': 'Brown / Kernan', '6': 'Marty Barry', '9': 'Gina Kennedy (Julie)', '4': 'Baglieri'},
-            '6': {'8': 'Gienna Kennedy Claudrex', '7': 'Tom McManis', '0': 'Alex Sproviero', '1': 'Scott Bilby', '5': 'Wohltman', '2': 'McEneny', '3': 'Brown / Kernan', '6': 'Polesky G&K', '9': 'Beth Baccarro', '4': 'K&C Laufer'},
-            '7': {'8': 'Brown / Kernan', '7': 'Scala', '0': 'Rob Zebrowski', '1': 'Kelly Eastmond', '5': 'Mike Trom', '2': 'Chris DeFuria', '3': 'Baglieri', '6': 'Scott Bilby', '9': 'Trombly Family', '4': 'Tom McManis'},
+            '5': {'8': 'Aaron Feldman', '7': 'Nina Tatarski', '0': 'Shayne Eastmond', '1': 'Kelly Kenneally', '5': 'Bart Dennin', '2': 'Rob Zebrowski', '3': 'Brown / Kernan', '6': 'Marty Barry', '9': 'Gina Kennedy', '4': 'Baglieri'},
+            '9': {'8': 'Kat Polesky', '7': 'Hank Trost', '0': 'Trish Brown', '1': 'Laura Leone', '5': 'Baglieri', '2': 'T.R & Darlens', '3': 'G Huch', '6': 'Kathleen Tombly', '9': 'Dawn Harriman', '4': 'Brown / Kernan'},
             '8': {'8': 'Maggy G', '7': 'Bonavita', '0': 'Mike Trom', '1': 'Liz Mills', '5': 'Charlie Leone', '2': 'Joe Tatarski', '3': 'Dave Johnson', '6': 'Mike Trom', '9': 'Trish Brown', '4': 'Alex Sporviero'},
-            '9': {'8': 'Kat Polesky', '7': 'Hank Trost', '0': 'Trish Brown', '1': 'Laura Leone', '5': 'Baglieri', '2': 'T.R & Darlens', '3': 'G Huch', '6': 'Kathleen Tombly', '9': 'Dawn Harriman', '4': 'Brown / Kernan'}
+            '3': {'8': 'Bob Fahey', '7': 'Polesky G&K', '0': 'Sheila Gonzalez', '1': 'Gina Kennedy', '5': 'George Polesky', '2': 'Todd Eastmond', '3': 'Wohltman', '6': 'Dave Leone', '9': 'Maggy G', '4': 'McEneny'},
+            '0': {'8': 'Scott Kennedy', '7': 'Wohltman', '0': 'Dave Johnson', '1': 'Kelly Kenneally', '5': 'Maggy G', '2': 'Aaron Feldman', '3': 'Kathleen Trombl', '6': 'Bonavita', '9': 'Chris DeFuria', '4': 'Beth Baccaro'},
+            '2': {'8': 'K&C Laufer', '7': 'Wilder H', '0': 'Elisabth Finkena', '1': 'Huch', '5': 'Dawn Harriman', '2': 'Bob Fahey', '3': 'Logan Mills', '6': 'Isla Eastmond', '9': 'Fogarty', '4': 'Scala'},
+            '1': {'8': 'McEneny', '7': 'Kim Boedart Bar', '0': 'Evertt Tatarski', '1': 'Trombly Family', '5': 'Huch', '2': 'Pat Dennin', '3': 'A&D Schuett', '6': 'Harry Tatarski', '9': 'Nick Mills', '4': 'Alex Sporviero'},
+            '4': {'8': 'Baglieri', '7': 'Fogarty', '0': 'Lexi Mills', '1': 'Baglieri', '5': 'Peter Gonzalez', '2': 'Bonavita', '3': 'Scott Kennedy', '6': 'Bob Crines', '9': 'Wohltman', '4': 'Baglieri'},
+            '7': {'8': 'Brown / Kernan', '7': 'Scala', '0': 'Rob Zebrowski', '1': 'Kelly Eastmond', '5': 'Mike Trom', '2': 'Chris DeFuria', '3': 'Baglieri', '6': 'Scott Bilby', '9': 'Trombly Family', '4': 'Tom McManis'},
+            '6': {'8': 'Gienna Kennedy', '7': 'Tom McManis', '0': 'Alex Sproviero', '1': 'Scott Bilby', '5': 'Wohltman', '2': 'McEneny', '3': 'Brown / Kernan', '6': 'Polesky G&K', '9': 'Beth Baccaro', '4': 'K&C Laufer'}
         }, 
         "SCHEDULE": {
             "20260326": "Sweet 16",  "20260327": "Sweet 16",
@@ -89,7 +87,6 @@ POOLS = {
 }
 
 # --- DYNAMIC INITIATION VIA STREAMLIT SECRETS ---
-# Reads the 'POOL_ID' secret from the cloud deployment. Defaults to "Shelly" if none exists.
 active_pool_id = st.secrets.get("POOL_ID", "Shelly")
 config = POOLS[active_pool_id]
 
@@ -109,20 +106,11 @@ def get_stretched_gradient(val, mx, mid):
 @st.cache_data(ttl=60)
 def fetch_tournament_data(pool_config):
     tz = pytz.timezone('US/Eastern')
-    start_date = tz.localize(pool_config["START_DATE"])
-    end_date = datetime.now(tz)
-    final_payout_events, live_games = [], []
-    current = start_date
+    now = datetime.now(tz)
     
-    while current <= end_date:
-        d_str = current.strftime("%Y%m%d")
-        rnd_name = pool_config["SCHEDULE"].get(d_str)
-        
-        # Skip dates not in this specific pool's schedule
-        if not rnd_name:
-            current += timedelta(days=1)
-            continue
-            
+    final_payout_events, live_games, upcoming_games = [], [], []
+    
+    for d_str, rnd_name in pool_config["SCHEDULE"].items():
         payout_rules = pool_config["PAYOUTS"].get(rnd_name, [])
         url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates={d_str}"
         
@@ -133,6 +121,9 @@ def fetch_tournament_data(pool_config):
                 comp = ev['competitions'][0]
                 h = next(t for t in comp['competitors'] if t['homeAway'] == 'home')
                 a = next(t for t in comp['competitors'] if t['homeAway'] == 'away')
+                
+                h_s = int(h.get('score', 0)) if h.get('score') else 0
+                a_s = int(a.get('score', 0)) if a.get('score') else 0
                 
                 h_half = int(h['linescores'][0]['value']) if 'linescores' in h and len(h['linescores']) > 0 else 0
                 a_half = int(a['linescores'][0]['value']) if 'linescores' in a and len(a['linescores']) > 0 else 0
@@ -146,6 +137,7 @@ def fetch_tournament_data(pool_config):
                 dt_est = pd.to_datetime(ev.get('date')).tz_convert('US/Eastern') if ev.get('date') else None
                 sort_time = dt_est.timestamp() if dt_est else 0
                 display_time = dt_est.strftime("%I:%M %p").lstrip('0') if dt_est else "TBD"
+                display_date = dt_est.strftime("%b %d") if dt_est else "TBD"
 
                 if "STATUS_FINAL" in status and payout_rules:
                     for rule in payout_rules:
@@ -162,7 +154,7 @@ def fetch_tournament_data(pool_config):
                         
                         final_payout_events.append({
                             "Winner": owner, "Payout": pay, "W": str(win_digit), "L": str(lose_digit),
-                            "Date": current.strftime("%m/%d"), "GameTime": sort_time, "DisplayTime": display_time,
+                            "Date": display_date, "GameTime": sort_time, "DisplayTime": display_time,
                             "Matchup": f"{a_disp} @ {h_disp}", "Result": result_str, 
                             "Round": rnd_name, "Type": p_type
                         })
@@ -202,37 +194,70 @@ def fetch_tournament_data(pool_config):
         
     final_payout_events.sort(key=lambda x: x.get('GameTime', 0))
     live_games.sort(key=lambda x: x.get('GameTime', 0))
-    return final_payout_events, live_games
+    upcoming_games.sort(key=lambda x: x.get('GameTime', 0))
+    
+    return final_payout_events, live_games, upcoming_games
 
 # --- 4. UI DISPLAY ---
 st.title(config["TITLE"])
-final_data, live_data = fetch_tournament_data(config)
+final_data, live_data, upcoming_data = fetch_tournament_data(config)
 
-if final_data:
-    st.header("🏆 Cumulative Standings")
-    df_f = pd.DataFrame(final_data)
-    lead = df_f.groupby("Winner").agg(Hits=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
-    lead['Total'] = lead['Total'].map('${:,.0f}'.format)
-    st.dataframe(lead, use_container_width=True, hide_index=True)
+# --- GAME ACTION: LIVE & UPCOMING (SIDE-BY-SIDE) ---
+if live_data or upcoming_data:
+    st.divider()
+    st.header("🏀 Game Action")
+    col_live, col_upcoming = st.columns(2)
+    
+    with col_live:
+        st.subheader("⏳ Live Games")
+        if live_data:
+            for g in live_data:
+                with st.container(border=True):
+                    st.markdown(f"**{g['Matchup']}**")
+                    st.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
+                    st.metric("Current Leader", g['Leader'], f"${g['Potential']}")
+        else:
+            st.info("No live games at the moment.")
+            
+    with col_upcoming:
+        st.subheader("📅 Upcoming Games")
+        if upcoming_data:
+            # Dynamically filter out "TBD" matchups
+            valid_upcoming = [g for g in upcoming_data if "TBA" not in g["Matchup"] and "TBD" not in g["Matchup"]]
+            
+            # Show up to 4 known matchups, or just 2 generic ones if none are set yet
+            display_upcoming = valid_upcoming[:4] if valid_upcoming else upcoming_data[:2]
+            
+            for g in display_upcoming:
+                with st.container(border=True):
+                    st.markdown(f"**{g['Matchup']}**")
+                    st.caption(f"{g['Date']} | {g['DisplayTime']} ET ({g['Round']})")
+                    st.markdown(f"⏳ *{g['Countdown']}*")
+        else:
+            st.info("No upcoming games currently scheduled.")
 
-if live_data:
-    st.header("⏳ Live Games")
-    for g in live_data:
-        with st.container(border=True):
-            c1, c2 = st.columns([2, 1])
-            c1.markdown(f"**{g['Matchup']}**")
-            c1.write(f"{g['Score']} | {g['Time']} (Tip-off: {g['DisplayTime']} ET)")
-            c2.metric("Current Leader", g['Leader'], f"${g['Potential']}")
-
+# --- RESULTS: STANDINGS & HISTORY (SIDE-BY-SIDE) ---
 if final_data:
     st.divider()
-    st.header("📜 Payout History")
-    for g in reversed(final_data):
-        type_badge = f"🔄 {g['Type']}" if g['Type'] in ['Reverse', 'Halftime'] else f"✅ {g['Type']}"
-        with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} | {type_badge}", expanded=False):
-            st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
-            st.write(f"**Score Context:** {g['Result']} (Win Digit: {g['W']} | Lose Digit: {g['L']})")
+    st.header("🏆 Results & History")
+    col_standings, col_history = st.columns(2)
+    
+    with col_standings:
+        st.subheader("🏅 Cumulative Standings")
+        df_f = pd.DataFrame(final_data)
+        lead = df_f.groupby("Winner").agg(Hits=('Winner','count'), Total=('Payout','sum')).sort_values("Total", ascending=False).reset_index()
+        lead['Total'] = lead['Total'].map('${:,.0f}'.format)
+        st.dataframe(lead, use_container_width=True, hide_index=True)
+        
+    with col_history:
+        st.subheader("📜 Payout History")
+        for g in reversed(final_data):
+            type_badge = f"🔄 {g['Type']}" if g['Type'] in ['Reverse', 'Halftime'] else f"✅ {g['Type']}"
+            with st.expander(f"**{g['Winner']}** won **${g['Payout']}** — {g['Matchup']} | {type_badge}", expanded=False):
+                st.write(f"**Tip-off:** {g['Date']} at {g['DisplayTime']} ET ({g['Round']})")
+                st.write(f"**Score Context:** {g['Result']} (Win Digit: {g['W']} | Lose Digit: {g['L']})")
 
+# --- GRID & EV DATA ---
 if True: 
     st.divider()
     st.header("📈 Heatmap & Expected Value")
@@ -287,7 +312,6 @@ if True:
             bg_cell, tx_cell = get_stretched_gradient(wins, max_win, mid_win) if wins > 0 else ("rgba(128,128,128,0.05)", "inherit")
             owner = config['GRID_DATA'].get(str(r), {}).get(str(c), "??")
             
-            # --- EV Calculation with Dynamic Blending ---
             weight_current = min(events_played / config["EST_EVENTS"], 1.0)
             weight_hist = 1.0 - weight_current
             
